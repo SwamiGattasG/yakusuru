@@ -486,10 +486,10 @@ def test_ollama_linux_install_without_root(monkeypatch, tmp_path, ext):
     monkeypatch.setattr(oi.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(oi.shutil, "which", lambda name: _sh.which(name) if name == "zstd" else None)
     where = oi._install_linux(tmp_path, lambda f, m: None, lambda: False)
+    assert oi.find_binary() == where and oi.is_installed()
     where = where.replace("\\", "/")          # Windows paths use backslashes
     assert where.endswith("bin/ollama") and "Yakusuru/tools/ollama" in where
     assert urls[0].startswith("https://ollama.com/download/ollama-linux-amd64")
-    assert oi.find_binary() == where and oi.is_installed()
 
 
 def test_mlx_engine_hooks_the_real_module():
