@@ -19,7 +19,7 @@ from ..languages import AUTO, guess_from_text
 from ..languages import get as get_lang
 from ..languages import name as lang_name
 from ..pipeline import lang_suffixes
-from ..subtitles import Cue, fmt_ts, joiner, parse_ts, read_srt, render_srt
+from ..subtitles import Cue, fmt_ts, is_rtl, joiner, parse_ts, read_srt, render_srt
 from . import theme
 from .async_util import run_async
 from ..i18n import _
@@ -183,8 +183,8 @@ class SubtitleEditor(QMainWindow):
         self.table = QTableWidget(0, 5)
         self.src_lang = self.meta.get("source_lang") or "und"
         self.tgt_lang = self.meta.get("target_lang") or self.s.target_lang
-        self.table.setHorizontalHeaderLabels(["#", _("Start"), _("End"), f"Original ({lang_name(self.src_lang)})",
-                                              f"Translation ({lang_name(self.tgt_lang)})"])
+        self.table.setHorizontalHeaderLabels(["#", _("Start"), _("End"), _("Original ({language})").format(language=lang_name(self.src_lang)),
+                                              _("Translation ({language})").format(language=lang_name(self.tgt_lang))])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(COL_N, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(COL_START, QHeaderView.ResizeMode.ResizeToContents)
@@ -216,6 +216,10 @@ class SubtitleEditor(QMainWindow):
                     it = QTableWidgetItem()
                     self.table.setItem(r, col, it)
                 it.setText(val)
+                if col in (COL_JA, COL_EN):        # text columns: right-align right-to-left languages
+                    lang = self.src_lang if col == COL_JA else self.tgt_lang
+                    it.setTextAlignment(int((Qt.AlignmentFlag.AlignRight if is_rtl(lang) else Qt.AlignmentFlag.AlignLeft)
+                                            | Qt.AlignmentFlag.AlignVCenter))
                 if col == COL_N:
                     it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     it.setForeground(QColor(t["muted"]))

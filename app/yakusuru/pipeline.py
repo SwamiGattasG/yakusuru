@@ -14,7 +14,7 @@ from . import __version__, audio, glossary
 from .config import Settings
 from .engines import Engine, get_engine_class
 from .models import can_whisper_translate, find_asr, is_anime_model, whisper_translate_model
-from .languages import AUTO, WHISPER_TRANSLATE_TARGETS, guess_from_text, untranslated_share
+from .languages import AUTO, WHISPER_TRANSLATE_TARGETS, copied_share, guess_from_text, untranslated_share
 from .languages import get as get_lang
 from .languages import name as lang_name
 from .subtitles import Cue, align_by_overlap, clean_cues, fix_timing, render_srt, resegment
@@ -359,9 +359,12 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
         # 5. check: never report success for "English" subtitles that are still Japanese -----
         if want_tgt and src_lang and s.translator != "echo":      # echo = test translator (copies text)
             got = tr_cues if (whisper_mode and tr_cues and not want_src) else cues
-            share = untranslated_share([c.tgt for c in got], src_lang, s.target_lang)
-            if share > 0.3:
-                n_bad = round(share * sum(1 for c in got if c.tgt.strip()))
+            script_share = untranslated_share([c.tgt for c in got], src_lang, s.target_lang)
+            # Same script on both sides (Spanish → English…): look for lines copied unchanged instead.
+            copy_share = (copied_share([(c.src, c.tgt) for c in cues if c.src and c.tgt])
+                          if script_share == 0 and not _same_language(src_lang, s.target_lang) else 0.0)
+            n_lines = sum(1 for c in got if c.tgt.strip())
+            if script_share > 0.3 or copy_share > 0.5:
                 if want_src and cues and not whisper_mode:
                     save_project(project_for(src, s), src, s, cues, [], stage="transcribed", src_lang=src_lang)
                 elif want_src and cues and any(c.src for c in cues):
@@ -371,15 +374,21 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
                                                              tgt_lang=s.target_lang, max_chars=s.max_line_chars,
                                                              max_chars_cjk=s.max_line_chars_cjk,
                                                              max_lines=s.max_lines), encoding="utf-8")
+                tgt_name, src_name = lang_name(s.target_lang), lang_name(src_lang)
+                what = (f"{round(script_share * n_lines)} of the {tgt_name} lines are still in {src_name} "
+                        f"({script_share:.0%})" if script_share > 0.3 else
+                        f"{copy_share:.0%} of the lines came back as the original {src_name} text, unchanged")
                 raise RuntimeError(
-                    f"Translation failed: {n_bad} of the {lang_name(s.target_lang)} lines are still in "
-                    f"{lang_name(src_lang)} ({share:.0%}). No {lang_name(s.target_lang)} subtitle file was written."
-                    + (" Whisper's built-in translation is unreliable for this audio — try an LLM translator "
+                    f"Translation failed: {what}. No {tgt_name} subtitle file was written."
+                    + (" Whisper's built-in translation is unreliable for this audio. Try an LLM translator "
                        "(Claude, Grok, OpenAI…) and use “Run Again”." if whisper_mode else
                        " The transcript was saved; use “Run Again” to retry just the translation."))
-            if share > 0:
-                log.warning("%.0f%% of the %s lines still look like %s — check them in the editor.",
-                            share * 100, lang_name(s.target_lang), lang_name(src_lang))
+            if script_share > 0:
+                log.warning("%.0f%% of the %s lines still look like %s. Check them in the editor.",
+                            script_share * 100, lang_name(s.target_lang), lang_name(src_lang))
+            elif copy_share > 0.15:
+                log.warning("%.0f%% of the lines were left unchanged from the original. Check them in the editor.",
+                            copy_share * 100)
 
         # 6. write ---------------------------------------------------------------
         emit("writing", done / total_w, _t("Writing subtitles"))

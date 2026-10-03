@@ -134,30 +134,54 @@ def target_languages() -> list[Language]:
 
 
 # --------------------------------------------------------------------------- script detection
-_SCRIPTS = [
-    ("ja", re.compile(r"[぀-ヿｦ-ﾟ]")),            # kana ⇒ Japanese
-    ("ko", re.compile(r"[가-힯ᄀ-ᇿ]")),
-    ("zh", re.compile(r"[一-鿿]")),                          # Han without kana
-    ("th", re.compile(r"[฀-๿]")),
-    ("ar", re.compile(r"[؀-ۿ]")),
-    ("he", re.compile(r"[֐-׿]")),
-    ("ru", re.compile(r"[Ѐ-ӿ]")),
-    ("el", re.compile(r"[Ͱ-Ͽ]")),
-    ("hi", re.compile(r"[ऀ-ॿ]")),
+# One table of writing systems: Unicode ranges, and the language a script most likely means when
+# an engine doesn't report one (guess_from_text). Latin is handled separately.
+SCRIPT_RANGES: list[tuple[str, int, int]] = [
+    ("kana", 0x3040, 0x30FF), ("kana", 0xFF66, 0xFF9F),
+    ("han", 0x4E00, 0x9FFF), ("han", 0x3400, 0x4DBF), ("han", 0xF900, 0xFAFF),
+    ("hangul", 0xAC00, 0xD7AF), ("hangul", 0x1100, 0x11FF), ("hangul", 0x3130, 0x318F),
+    ("thai", 0x0E00, 0x0E7F), ("lao", 0x0E80, 0x0EFF), ("khmer", 0x1780, 0x17FF),
+    ("myanmar", 0x1000, 0x109F), ("tibetan", 0x0F00, 0x0FFF),
+    ("arabic", 0x0600, 0x06FF), ("arabic", 0x0750, 0x077F), ("arabic", 0xFB50, 0xFDFF), ("arabic", 0xFE70, 0xFEFF),
+    ("hebrew", 0x0590, 0x05FF), ("cyrillic", 0x0400, 0x04FF), ("cyrillic", 0x0500, 0x052F),
+    ("greek", 0x0370, 0x03FF), ("armenian", 0x0530, 0x058F), ("georgian", 0x10A0, 0x10FF),
+    ("ethiopic", 0x1200, 0x137F),
+    ("devanagari", 0x0900, 0x097F), ("bengali", 0x0980, 0x09FF), ("gurmukhi", 0x0A00, 0x0A7F),
+    ("gujarati", 0x0A80, 0x0AFF), ("oriya", 0x0B00, 0x0B7F), ("tamil", 0x0B80, 0x0BFF),
+    ("telugu", 0x0C00, 0x0C7F), ("kannada", 0x0C80, 0x0CFF), ("malayalam", 0x0D00, 0x0D7F),
+    ("sinhala", 0x0D80, 0x0DFF),
 ]
+SCRIPT_DEFAULT_LANG = {
+    "kana": "ja", "han": "zh", "hangul": "ko", "thai": "th", "lao": "lo", "khmer": "km", "myanmar": "my",
+    "tibetan": "bo", "arabic": "ar", "hebrew": "he", "cyrillic": "ru", "greek": "el", "armenian": "hy",
+    "georgian": "ka", "ethiopic": "am", "devanagari": "hi", "bengali": "bn", "gurmukhi": "pa", "gujarati": "gu",
+    "oriya": "or", "tamil": "ta", "telugu": "te", "kannada": "kn", "malayalam": "ml", "sinhala": "si",
+}
+
+
+def _char_script(ch: str) -> str | None:
+    o = ord(ch)
+    if o < 0x0250:
+        return "latin" if ch.isalpha() else None
+    for name, lo, hi in SCRIPT_RANGES:
+        if lo <= o <= hi:
+            return name
+    return None
 
 
 def guess_from_text(text: str) -> str | None:
     """Rough script-based guess, used only when an engine doesn't report the detected language."""
-    sample = text[:4000]
-    best, count = None, 0
-    for code, rx in _SCRIPTS:
-        n = len(rx.findall(sample))
-        if n > count:
-            best, count = code, n
-    if best == "zh" and _SCRIPTS[0][1].search(sample):
-        best = "ja"
-    return best if count >= 5 else None
+    counts: dict[str, int] = {}
+    for ch in text[:4000]:
+        sc = _char_script(ch)
+        if sc and sc != "latin":
+            counts[sc] = counts.get(sc, 0) + 1
+    if not counts:
+        return None
+    if counts.get("kana"):                       # kana anywhere ⇒ Japanese (kanji count as Japanese too)
+        counts["kana"] += counts.pop("han", 0)
+    best = max(counts, key=counts.get)
+    return SCRIPT_DEFAULT_LANG.get(best) if counts[best] >= 5 else None
 
 
 def uses_nospace_text(text: str) -> bool:
@@ -169,36 +193,15 @@ def uses_nospace_text(text: str) -> bool:
 # --------------------------------------------------------------------------- output check
 # Which writing systems a language uses. Anything not listed is Latin script.
 _LANG_SCRIPTS = {
-    "ja": {"kana", "han"}, "zh": {"han"}, "yue": {"han"}, "ko": {"hangul"}, "th": {"thai"},
-    "ar": {"arabic"}, "fa": {"arabic"}, "ur": {"arabic"}, "ps": {"arabic"}, "he": {"hebrew"}, "yi": {"hebrew"},
-    "el": {"greek"}, "hi": {"devanagari"}, "mr": {"devanagari"}, "ne": {"devanagari"}, "sa": {"devanagari"},
+    "ja": {"kana", "han"}, "zh": {"han"}, "yue": {"han"}, "ko": {"hangul"}, "th": {"thai"}, "lo": {"lao"},
+    "km": {"khmer"}, "my": {"myanmar"}, "bo": {"tibetan"},
+    "ar": {"arabic"}, "fa": {"arabic"}, "ur": {"arabic"}, "ps": {"arabic"}, "sd": {"arabic"},
+    "he": {"hebrew"}, "yi": {"hebrew"}, "el": {"greek"}, "hy": {"armenian"}, "ka": {"georgian"},
+    "am": {"ethiopic"}, "bn": {"bengali"}, "as": {"bengali"}, "pa": {"gurmukhi"}, "gu": {"gujarati"},
+    "or": {"oriya"}, "ta": {"tamil"}, "te": {"telugu"}, "kn": {"kannada"}, "ml": {"malayalam"}, "si": {"sinhala"},
+    **{c: {"devanagari"} for c in ("hi", "mr", "ne", "sa")},
     **{c: {"cyrillic"} for c in ("ru", "uk", "be", "bg", "mk", "sr", "kk", "ba", "tt", "mn", "tg")},
 }
-
-
-def _char_script(ch: str) -> str | None:
-    o = ord(ch)
-    if 0x3040 <= o <= 0x30FF or 0xFF66 <= o <= 0xFF9F:
-        return "kana"
-    if 0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF:
-        return "han"
-    if 0xAC00 <= o <= 0xD7AF or 0x1100 <= o <= 0x11FF:
-        return "hangul"
-    if 0x0E00 <= o <= 0x0E7F:
-        return "thai"
-    if 0x0600 <= o <= 0x06FF:
-        return "arabic"
-    if 0x0590 <= o <= 0x05FF:
-        return "hebrew"
-    if 0x0400 <= o <= 0x04FF:
-        return "cyrillic"
-    if 0x0370 <= o <= 0x03FF:
-        return "greek"
-    if 0x0900 <= o <= 0x097F:
-        return "devanagari"
-    if ch.isalpha() and o < 0x0250:
-        return "latin"
-    return None
 
 
 def scripts_of(code: str | None) -> set[str]:
@@ -233,3 +236,25 @@ def untranslated_share(texts: list[str], src_lang: str | None, tgt_lang: str) ->
         if in_src > in_tgt:
             bad += 1
     return bad / len(lines)
+
+
+def _norm(text: str) -> str:
+    """Letters and digits only, case-folded: 'Hola, ¿qué tal?' → 'holaquétal'."""
+    return "".join(ch for ch in text.casefold() if ch.isalnum())
+
+
+def copied_share(pairs: list[tuple[str, str]]) -> float:
+    """Fraction (0–1) of real sentences whose 'translation' is just the original text again.
+
+    Catches the failure untranslated_share can't see: languages that share a script (Spanish →
+    English, German → French). Short lines (names, "OK", "Ja!") are ignored, since those are often
+    legitimately identical."""
+    eligible = copied = 0
+    for src, tgt in pairs:
+        s = _norm(src)
+        if len(s) < 12 or len(src.split()) < 3 and not uses_nospace_text(src):
+            continue
+        eligible += 1
+        if s == _norm(tgt):
+            copied += 1
+    return copied / eligible if eligible >= 3 else 0.0

@@ -827,3 +827,71 @@ def test_set_language_and_fallback():
         assert i18n.set_language("xx") == "en" and i18n._("Add Files") == "Add Files"
     finally:
         i18n.set_language("en")
+
+
+# ----------------------------------------------------------------------------- language fixes (1.1.1)
+def test_rtl_lines_get_direction_marks_and_import_strips_them(tmp_path):
+    from yakusuru.subtitles import RLM, Cue, read_srt, render_srt
+    srt = render_srt([Cue(0, 2, "", "مرحبا، كيف حالك؟"), Cue(2, 4, "", "2024 هو العام")], "tgt", tgt_lang="ar")
+    lines = [l for l in srt.split("\n") if l and "-->" not in l and not l.isdigit()]
+    assert all(l.startswith(RLM) and l.endswith(RLM) for l in lines)
+    assert RLM not in render_srt([Cue(0, 2, "", "Hello?")], "tgt", tgt_lang="en")
+    bi = render_srt([Cue(0, 2, "שלום", "Hello")], "bi", src_lang="he", tgt_lang="en")
+    assert f"{RLM}שלום{RLM}\nHello" in bi                      # only the Hebrew line is marked
+    p = tmp_path / "x.srt"
+    p.write_text(srt, encoding="utf-8")
+    assert RLM not in read_srt(p)[0][2]
+
+
+def test_all_scripts_detected():
+    from yakusuru.languages import guess_from_text, untranslated_share
+    samples = {"bn": "আমি বাংলায় কথা বলি", "ta": "நான் தமிழில் பேசுகிறேன்", "te": "నేను తెలుగు మాట్లాడతాను",
+               "gu": "હું ગુજરાતી બોલું છું", "pa": "ਮੈਂ ਪੰਜਾਬੀ ਬੋਲਦਾ ਹਾਂ", "kn": "ನಾನು ಕನ್ನಡ ಮಾತನಾಡುತ್ತೇನೆ",
+               "ml": "ഞാൻ മലയാളം സംസാരിക്കുന്നു", "si": "මම සිංහල කතා කරමි", "my": "ကျွန်တော် မြန်မာစကား ပြောပါတယ်",
+               "km": "ខ្ញុំនិយាយភាសាខ្មែរ", "lo": "ຂ້ອຍເວົ້າພາສາລາວ", "ka": "მე ვლაპარაკობ ქართულად",
+               "hy": "Ես խոսում եմ հայերեն", "am": "እኔ አማርኛ እናገራለሁ", "bo": "ང་བོད་སྐད་ཤོད་ཀྱི་ཡོད།",
+               "ja": "今日はいい天気ですね", "zh": "今天天气很好我们去公园", "ko": "오늘 날씨가 좋네요"}
+    for code, text in samples.items():
+        assert guess_from_text(text) == code, code
+        assert untranslated_share([text, "This one is in English"], code, "en") == 0.5, code
+
+
+def test_copied_lines_are_caught_for_same_script_pairs():
+    from yakusuru.languages import copied_share
+    es = ["¿Dónde está la estación de tren?", "Mañana vamos a la playa con mis primos.",
+          "No sé si voy a poder llegar a tiempo.", "Hola"]
+    assert copied_share([(x, x) for x in es]) == 1.0                    # echoed back unchanged
+    good = ["Where is the train station?", "Tomorrow we're going to the beach with my cousins.",
+            "I don't know if I'll make it on time.", "Hola"]
+    assert copied_share(list(zip(es, good))) == 0.0                    # short "Hola" ignored
+
+
+def test_pipeline_fails_when_translation_copies_the_source(media, monkeypatch, tmp_path):
+    _iso(monkeypatch, tmp_path)
+    import yakusuru.translators as T
+    from yakusuru.config import Settings
+    from yakusuru.engines.dummy_engine import DummyEngine
+    from yakusuru.pipeline import EngineCache, process
+    from yakusuru.subtitles import Cue
+    from yakusuru.translators.providers import EchoTranslator
+
+    lines = ["¿Dónde está la estación de tren?", "Mañana vamos a la playa con mis primos.",
+             "No sé si voy a poder llegar a tiempo.", "Ella dijo que la película empieza a las ocho."]
+
+    def transcribe(self, audio, wav_path, duration, task, progress, cancelled):
+        progress(1.0)
+        return [Cue(i * 3, i * 3 + 2.5, l) for i, l in enumerate(lines)]
+
+    class CopyTranslator(EchoTranslator):      # "succeeds" but hands the Spanish back untouched
+        def translate(self, src, *a, **k):
+            return list(src)
+
+    monkeypatch.setattr(DummyEngine, "transcribe", transcribe)
+    monkeypatch.setattr(T, "get_translator", lambda name, st: CopyTranslator(st))
+    s = Settings()
+    s.engine, s.asr_model, s.source_lang, s.target_lang = "dummy", "dummy", "es", "en"
+    s.translator = "openai_compatible"            # a real translator name, so the check runs
+    s.out_translation, s.out_original = True, True
+    with pytest.raises(RuntimeError, match="came back as the original"):
+        process(media, s, EngineCache(), lambda *a: None, lambda: False)
+    assert not list(media.parent.glob("*.en.srt"))

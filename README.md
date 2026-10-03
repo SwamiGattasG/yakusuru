@@ -106,6 +106,7 @@ You can reopen it any time from **Tools → Setup Wizard**.
 - **Same language in and out** (for example Spanish → Spanish) gives you a cleaned-up transcript with no translation.
 - **Output names** use language codes, for example `show.en.srt`, `show.ja.srt` and `show.ja-en.srt`, so video players pick the right track.
 - **Japanese-only models:** kotoba-whisper and anime-whisper only understand Japanese. For other languages use large-v3 or large-v3-turbo; the app warns you if the model doesn't match the language.
+- **Right-to-left languages** (Arabic, Hebrew, Persian, Urdu and others) get invisible direction marks on every subtitle line, so players keep punctuation and numbers on the correct side.
 - **Line wrapping** follows the script: Japanese, Chinese and Thai wrap by character, everything else by word, and full-width scripts use a shorter line limit.
 
 ## Choosing models (with Japanese tips)

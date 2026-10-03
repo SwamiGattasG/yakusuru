@@ -320,6 +320,25 @@ def align_by_overlap(base: list[Cue], other: list[Cue], attr: str = "tgt") -> No
 
 
 # --------------------------------------------------------------------------- SRT I/O
+RLM = "\u200f"          # right-to-left mark
+_BIDI_MARKS = "\u200e\u200f\u202a\u202b\u202c\u202d\u202e"
+
+
+def is_rtl(lang: str | None) -> bool:
+    return bool(lang) and lang not in ("auto", "und") and get_lang(lang).rtl
+
+
+def bidi(text: str, lang: str | None) -> str:
+    """Mark each line of right-to-left text so players lay it out right to left.
+
+    Without this, a line that starts or ends with punctuation or a number (very common in
+    subtitles: "...", "?", "2024") is laid out left to right by many players, putting the period
+    at the start of an Arabic or Hebrew sentence. A right-to-left mark at both ends fixes it."""
+    if not text or not is_rtl(lang):
+        return text
+    return "\n".join(f"{RLM}{line.strip(_BIDI_MARKS)}{RLM}" if line.strip() else line for line in text.split("\n"))
+
+
 def render_srt(cues: Iterable[Cue], mode: str, src_lang: str | None = None, tgt_lang: str | None = None,
                max_chars: int = 42, max_chars_cjk: int = 22, max_lines: int = 2) -> str:
     """mode: 'tgt' (translation) | 'src' (transcript) | 'bi' (transcript above translation)."""
@@ -328,11 +347,12 @@ def render_srt(cues: Iterable[Cue], mode: str, src_lang: str | None = None, tgt_
     n = 0
     for c in cues:
         if mode == "tgt":
-            text = wrap(c.tgt, tgt_lang, **kw)
+            text = bidi(wrap(c.tgt, tgt_lang, **kw), tgt_lang)
         elif mode == "src":
-            text = wrap(c.src, src_lang, **kw)
+            text = bidi(wrap(c.src, src_lang, **kw), src_lang)
         else:
-            text = "\n".join(t for t in (wrap(c.src, src_lang, **kw), wrap(c.tgt, tgt_lang, **kw)) if t)
+            text = "\n".join(t for t in (bidi(wrap(c.src, src_lang, **kw), src_lang),
+                                         bidi(wrap(c.tgt, tgt_lang, **kw), tgt_lang)) if t)
         if not text.strip():
             continue
         n += 1
@@ -388,5 +408,6 @@ def read_srt(path: Path) -> list[tuple[float, float, str]]:
             continue
         a, b = ts_line.split("-->")
         text_lines = lines[lines.index(ts_line) + 1:]
-        out.append((parse_ts(a), parse_ts(b), "\n".join(text_lines)))
+        text = "\n".join(l.strip(_BIDI_MARKS) for l in text_lines)      # direction marks are added on write
+        out.append((parse_ts(a), parse_ts(b), text))
     return out
