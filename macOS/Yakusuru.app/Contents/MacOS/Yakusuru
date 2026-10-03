@@ -2,17 +2,53 @@
 # Yakusuru — macOS app launcher.
 # First run (or if something is broken) opens Terminal to show installation progress;
 # afterwards the app starts directly.
+#
+# Where the app's code lives, in order:
+#   1. inside this bundle (Contents/Resources/app): the self-contained app from a release download,
+#      which works wherever it is dragged (Applications, Desktop…)
+#   2. next to the bundle (<Yakusuru folder>/macOS/Yakusuru.app → <Yakusuru folder>/app): the
+#      project folder layout
+#   3. the Yakusuru folder this launcher found before (remembered), or one Spotlight finds, for a
+#      copy of the folder's app that was dragged somewhere else
 
 BUNDLE="$(cd "$(dirname "$0")/../.." && pwd)"
-ROOT="$(cd "$BUNDLE/../.." && pwd)"
-APPDIR="$ROOT/app"
 DATA="$HOME/Library/Application Support/Yakusuru"
 OLD_DATA="$HOME/Library/Application Support/LanguageInterpreter"
 # The app used to be called "Language Interpreter": adopt its environment instead of reinstalling.
 if [ ! -e "$DATA" ] && [ -d "$OLD_DATA" ]; then mv "$OLD_DATA" "$DATA"; fi
-PY="$DATA/venv/bin/python"
-INSTALLER="$ROOT/macOS/Install or Repair.command"
 mkdir -p "$DATA/logs"
+REMEMBER="$DATA/app-folder"
+
+is_app_dir() { [ -f "$1/bootstrap.py" ] && grep -q 'APP_NAME = "Yakusuru"' "$1/yakusuru/__init__.py" 2>/dev/null; }
+
+APPDIR=""
+if is_app_dir "$BUNDLE/Contents/Resources/app"; then
+    APPDIR="$BUNDLE/Contents/Resources/app"
+    INSTALLER="$BUNDLE/Contents/Resources/Install or Repair.command"
+elif is_app_dir "$BUNDLE/../../app"; then
+    APPDIR="$(cd "$BUNDLE/../../app" && pwd)"
+    printf '%s\n' "$APPDIR" > "$REMEMBER"
+else
+    if [ -f "$REMEMBER" ] && is_app_dir "$(cat "$REMEMBER")"; then
+        APPDIR="$(cat "$REMEMBER")"
+    else
+        # Ask Spotlight for a Yakusuru folder (the app's bootstrap.py next to its yakusuru package).
+        while IFS= read -r f; do
+            d="$(dirname "$f")"
+            if is_app_dir "$d"; then APPDIR="$d"; break; fi
+        done < <(mdfind -name bootstrap.py 2>/dev/null | grep '/app/bootstrap\.py$')
+        [ -n "$APPDIR" ] && printf '%s\n' "$APPDIR" > "$REMEMBER"
+    fi
+fi
+
+if [ -z "$APPDIR" ]; then
+    osascript -e 'display dialog "Yakusuru can’t find its files.\n\nThis copy of Yakusuru.app was moved out of its Yakusuru folder. Either open it from inside the Yakusuru folder, or download the latest version from GitHub, whose app works from anywhere, including Applications." buttons {"Close", "Open Downloads Page"} default button 2 with title "Yakusuru" with icon caution' \
+              -e 'if button returned of result is "Open Downloads Page" then open location "https://github.com/SwamiGattasG/yakusuru/releases/latest"' >/dev/null 2>&1
+    exit 1
+fi
+[ -z "$INSTALLER" ] && INSTALLER="$(cd "$APPDIR/.." && pwd)/macOS/Install or Repair.command"
+
+PY="$DATA/venv/bin/python"
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 RUN=(); HW=x86_64; MAXV="(3,12)"
@@ -24,12 +60,14 @@ CHECK="import sys, platform, PySide6; sys.exit(0 if platform.machine() == '$HW' 
 
 if [ ! -f "$DATA/venv/.core-installed" ] || ! "${RUN[@]}" "$PY" -c "$CHECK" >/dev/null 2>&1; then
     chmod +x "$INSTALLER" 2>/dev/null
-    # Run the installer in a new Terminal window. The command starts with spaces because some
-    # shell setups (oh-my-zsh update checks, instant prompts) swallow the first typed characters.
-    ESC_PATH="${INSTALLER//\\/\\\\}"; ESC_PATH="${ESC_PATH//\"/\\\"}"
+    # Run the installer in a new Terminal window, telling it where the app's code is. The command
+    # starts with spaces because some shell setups (oh-my-zsh update checks, instant prompts)
+    # swallow the first typed characters.
+    q() { local s="${1//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
+    CMD="   clear; YAKUSURU_APPDIR='$(q "$APPDIR")' YAKUSURU_BUNDLE='$(q "$BUNDLE")' bash '$(q "$INSTALLER")'"
     osascript -e "tell application \"Terminal\"" \
               -e "activate" \
-              -e "do script \"   clear; bash '${ESC_PATH}'\"" \
+              -e "do script \"$CMD\"" \
               -e "end tell" >/dev/null 2>&1 || open -a Terminal "$INSTALLER"
     exit 0
 fi

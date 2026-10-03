@@ -895,3 +895,50 @@ def test_pipeline_fails_when_translation_copies_the_source(media, monkeypatch, t
     with pytest.raises(RuntimeError, match="came back as the original"):
         process(media, s, EngineCache(), lambda *a: None, lambda: False)
     assert not list(media.parent.glob("*.en.srt"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="bash launcher")
+def test_mac_launcher_finds_its_code_wherever_it_is(tmp_path):
+    """Yakusuru.app works inside the folder, as a self-contained release app, and when a copy was
+    dragged to Applications (remembered folder); otherwise it explains instead of quitting silently."""
+    import shutil
+    root = Path(__file__).resolve().parents[2]
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    for name, body in {"osascript": 'echo "OSA $*" >> "$T_LOG"', "mdfind": "true", "sysctl": "echo 0",
+                       "open": "true"}.items():
+        (bin_ / name).write_text(f"#!/bin/bash\n{body}\n")
+        (bin_ / name).chmod(0o755)
+
+    def app_at(bundle):
+        (bundle / "Contents" / "MacOS").mkdir(parents=True)
+        shutil.copy(root / "macOS/Yakusuru.app/Contents/MacOS/Yakusuru", bundle / "Contents/MacOS/Yakusuru")
+        return bundle
+
+    def code_at(d):
+        (d / "yakusuru").mkdir(parents=True)
+        shutil.copy(root / "app/bootstrap.py", d)
+        shutil.copy(root / "app/yakusuru/__init__.py", d / "yakusuru")
+
+    def launch(bundle):
+        log = tmp_path / "log"
+        log.unlink(missing_ok=True)
+        env = {**os.environ, "HOME": str(tmp_path / "home"), "T_LOG": str(log),
+               "PATH": f"{bin_}{os.pathsep}{os.environ['PATH']}"}
+        r = subprocess.run(["bash", str(bundle / "Contents/MacOS/Yakusuru")], env=env)
+        return r.returncode, log.read_text() if log.exists() else ""
+
+    release = app_at(tmp_path / "Release/Yakusuru.app")
+    code_at(release / "Contents/Resources/app")
+    assert "YAKUSURU_APPDIR='" + str(release / "Contents/Resources/app") in launch(release)[1]
+
+    folder_app = app_at(tmp_path / "Folder/macOS/Yakusuru.app")
+    code_at(tmp_path / "Folder/app")
+    assert "YAKUSURU_APPDIR='" + str(tmp_path / "Folder/app") in launch(folder_app)[1]
+
+    moved = app_at(tmp_path / "Applications/Yakusuru.app")
+    assert "YAKUSURU_APPDIR='" + str(tmp_path / "Folder/app") in launch(moved)[1]     # remembered
+
+    (tmp_path / "home/Library/Application Support/Yakusuru/app-folder").unlink()
+    code, log = launch(moved)
+    assert code == 1 and "find its files" in log

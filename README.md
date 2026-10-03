@@ -52,7 +52,8 @@ Grab the latest zip from **[Releases](https://github.com/SwamiGattasG/yakusuru/r
 
 ## Quick start
 
-**macOS:** open `macOS/` and double-click **Yakusuru.app**. You can drag it to the Dock.
+**macOS:** open `macOS/` and drag **Yakusuru.app** to your Applications folder (or just double-click it where it is).
+- The app from a release download is self-contained, so it works from Applications, the Dock or anywhere else.
 - The first run opens Terminal to set everything up, then opens the app.
 - If macOS blocks it, right-click the file, choose **Open**, then confirm with **Open**.
 - If setup is ever broken, run **Install or Repair.command**.

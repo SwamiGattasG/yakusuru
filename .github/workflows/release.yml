@@ -56,8 +56,15 @@ jobs:
             ref="HEAD"
             git rev-parse -q --verify "refs/tags/$tag" >/dev/null && ref="$tag"
             zip="Yakusuru-$tag.zip"
+            rm -rf stage && mkdir stage
             # git archive keeps the executable bits the macOS/Linux launchers need.
-            git archive --format=zip --prefix="Yakusuru/" -o "$zip" "$ref"
+            git archive --format=tar --prefix="Yakusuru/" "$ref" | tar -x -C stage
+            # Make the Mac app self-contained: its code and installer go inside the bundle, so
+            # Yakusuru.app keeps working when dragged to Applications (or anywhere else).
+            res="stage/Yakusuru/macOS/Yakusuru.app/Contents/Resources"
+            cp -R stage/Yakusuru/app "$res/app"
+            cp "stage/Yakusuru/macOS/Install or Repair.command" "$res/"
+            (cd stage && zip -r -y -q -X "../$zip" Yakusuru)
             notes=".github/release-notes/$tag.md"
             if gh release view "$tag" >/dev/null 2>&1; then
               gh release upload "$tag" "$zip" --clobber

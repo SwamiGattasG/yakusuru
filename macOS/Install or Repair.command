@@ -6,6 +6,10 @@
 
 cd "$(dirname "$0")" || exit 1
 ROOT="$(cd .. && pwd)"
+# The app launcher passes these when the app runs from somewhere else (e.g. /Applications, or the
+# self-contained app whose code lives inside the bundle). Defaults: the Yakusuru folder layout.
+APPDIR="${YAKUSURU_APPDIR:-$ROOT/app}"
+BUNDLE="${YAKUSURU_BUNDLE:-$ROOT/macOS/Yakusuru.app}"
 
 # On Apple Silicon, make sure this script itself runs natively (not under Rosetta),
 # otherwise Python, PyTorch and MLX would all be set up for Intel.
@@ -73,12 +77,12 @@ fi
 
 echo "Using $PY ($("$PY" --version 2>&1))"
 echo ""
-if "$PY" "$ROOT/app/bootstrap.py" --no-launch "$@"; then
-    chmod +x "$ROOT/macOS/Yakusuru.app/Contents/MacOS/Yakusuru" 2>/dev/null
+if "$PY" "$APPDIR/bootstrap.py" --no-launch "$@"; then
+    chmod +x "$BUNDLE/Contents/MacOS/Yakusuru" 2>/dev/null
     echo ""
     echo "Opening Yakusuru… (you can close this window)"
-    open "$ROOT/macOS/Yakusuru.app" 2>/dev/null || \
-        (cd "$ROOT/app" && nohup "$HOME/Library/Application Support/Yakusuru/venv/bin/python" -m yakusuru >/dev/null 2>&1 &)
+    open "$BUNDLE" 2>/dev/null || \
+        (cd "$APPDIR" && nohup "$HOME/Library/Application Support/Yakusuru/venv/bin/python" -m yakusuru >/dev/null 2>&1 &)
     sleep 2
     exit 0
 else
