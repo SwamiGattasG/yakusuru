@@ -366,6 +366,11 @@ class MainWindow(QMainWindow):
         side_scroll.setFrameShape(QFrame.Shape.NoFrame)
         side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         side_scroll.setWidget(side)
+        # Long labels in some languages must not push the panel wider than its visible area:
+        # let every dropdown shrink (its full text stays in the popup and tooltip).
+        for cb in side.findChildren(QComboBox):
+            cb.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            cb.setMinimumContentsLength(8)
         side_col = QWidget()
         sc = QVBoxLayout(side_col)
         sc.setContentsMargins(0, 0, 0, 0)

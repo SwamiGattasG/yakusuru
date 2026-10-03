@@ -18,7 +18,12 @@ from pathlib import Path
 LOCALES = Path(__file__).resolve().parent / "locales"
 
 # code → name shown in the language picker (in its own language)
-UI_LANGUAGES = {"en": "English", "es": "Español", "ja": "日本語"}
+UI_LANGUAGES = {
+    "en": "English", "de": "Deutsch", "es": "Español", "fr": "Français", "it": "Italiano",
+    "pt": "Português (Brasil)", "ru": "Русский", "ja": "日本語", "ko": "한국어",
+}
+# Qt's own translations (OK / Cancel buttons) are named by locale; Brazilian for Portuguese.
+QT_LOCALE = {"pt": "pt_BR"}
 
 _catalog: dict[str, str] = {}
 _current = "en"

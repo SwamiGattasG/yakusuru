@@ -40,7 +40,7 @@ Japanese to English gets extra care, with honorifics, Japanese-tuned models like
 - **Consistent names and terms.** A glossary and short show notes keep character names, honorifics and jargon the same in every episode.
 - **A real subtitle editor.** Preview the video, retime lines, split and merge, find and replace, and re-translate single lines.
 - **Honest about failures.** If a translation comes back in the wrong language, the file is marked as failed instead of quietly saved, and the transcript is kept so you can retry just the translation.
-- **Speaks your language.** The interface is available in English, Spanish and Japanese, and follows your system language automatically.
+- **Speaks your language.** The interface is available in English, German, French, Italian, Spanish, Portuguese, Russian, Japanese and Korean, and follows your system language automatically.
 - **Feels at home on your desktop.** Follows your system's light or dark mode and accent color, live.
 
 ## Download

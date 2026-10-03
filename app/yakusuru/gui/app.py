@@ -65,7 +65,7 @@ def make_icon(size: int = 256) -> QPixmap:
 
 def _install_translations(app, setting: str) -> None:
     """Interface language: our own catalog plus Qt's for standard buttons (OK, Cancel, Yes…)."""
-    from ..i18n import set_language
+    from ..i18n import QT_LOCALE, set_language
     code = set_language(setting)
     logging.getLogger(__name__).info("Interface language: %s (setting: %s)", code, setting)
     if code == "en":
@@ -75,7 +75,7 @@ def _install_translations(app, setting: str) -> None:
     app._qt_translators = []
     for name in ("qtbase", "qt"):
         tr = QTranslator(app)
-        if tr.load(QLocale(code), name, "_", path):
+        if tr.load(QLocale(QT_LOCALE.get(code, code)), name, "_", path):
             app.installTranslator(tr)
             app._qt_translators.append(tr)
 
