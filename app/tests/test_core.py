@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -285,13 +286,21 @@ def test_legacy_name_migration(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    old = tmp_path / "data" / "LanguageInterpreter" / "venv"
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    # Where this OS keeps app data (mirrors paths.data_dir)
+    if sys.platform == "darwin":
+        base = tmp_path / "Library" / "Application Support"
+    elif os.name == "nt":
+        base = tmp_path / "local"
+    else:
+        base = tmp_path / "data"
+    old = base / "LanguageInterpreter" / "venv"
     old.mkdir(parents=True)
     (old / ".core-installed").write_text("x")
     from yakusuru import paths
     d = paths.data_dir()
-    assert d.name == "Yakusuru" and (d / "venv" / ".core-installed").exists()
-    assert not (tmp_path / "data" / "LanguageInterpreter").exists()
+    assert d == base / "Yakusuru" and (d / "venv" / ".core-installed").exists()
+    assert not (base / "LanguageInterpreter").exists()
 
 
 def test_legacy_project_file_is_found(tmp_path):
@@ -477,6 +486,7 @@ def test_ollama_linux_install_without_root(monkeypatch, tmp_path, ext):
     monkeypatch.setattr(oi.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(oi.shutil, "which", lambda name: _sh.which(name) if name == "zstd" else None)
     where = oi._install_linux(tmp_path, lambda f, m: None, lambda: False)
+    where = where.replace("\\", "/")          # Windows paths use backslashes
     assert where.endswith("bin/ollama") and "Yakusuru/tools/ollama" in where
     assert urls[0].startswith("https://ollama.com/download/ollama-linux-amd64")
     assert oi.find_binary() == where and oi.is_installed()
