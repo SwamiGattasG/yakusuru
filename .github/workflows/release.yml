@@ -1,7 +1,10 @@
 name: Release
 
-# Push a tag like v1.0.0 to publish a downloadable zip on the Releases page.
+# Publishes a downloadable zip for a version. Runs when a release is published on GitHub
+# (Releases → Draft a new release) or when a tag like v1.0.0 is pushed.
 on:
+  release:
+    types: [published]
   push:
     tags: ["v*"]
 
@@ -15,17 +18,22 @@ jobs:
       - uses: actions/checkout@v5
       - name: Build zip
         run: |
-          name="Yakusuru-${GITHUB_REF_NAME}"
+          tag="${{ github.event.release.tag_name || github.ref_name }}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
           # git archive keeps the executable bits the macOS/Linux launchers need.
-          git archive --format=zip --prefix="Yakusuru/" -o "$name.zip" HEAD
-          echo "ZIP=$name.zip" >> "$GITHUB_ENV"
-      - name: Publish release
+          git archive --format=zip --prefix="Yakusuru/" -o "Yakusuru-$tag.zip" HEAD
+          echo "ZIP=Yakusuru-$tag.zip" >> "$GITHUB_ENV"
+      - name: Attach to the release (creating it if needed)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
-          if [ -f "$notes" ]; then
-            gh release create "$GITHUB_REF_NAME" "$ZIP" --title "Yakusuru ${GITHUB_REF_NAME#v}" --notes-file "$notes"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$ZIP" --title "Yakusuru ${GITHUB_REF_NAME#v}" --generate-notes
+            notes=".github/release-notes/$TAG.md"
+            if [ -f "$notes" ]; then
+              gh release create "$TAG" "$ZIP" --title "Yakusuru ${TAG#v}" --notes-file "$notes"
+            else
+              gh release create "$TAG" "$ZIP" --title "Yakusuru ${TAG#v}" --generate-notes
+            fi
           fi
