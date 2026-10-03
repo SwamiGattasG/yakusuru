@@ -63,13 +63,31 @@ def make_icon(size: int = 256) -> QPixmap:
     return pm
 
 
+def _install_translations(app, setting: str) -> None:
+    """Interface language: our own catalog plus Qt's for standard buttons (OK, Cancel, Yes…)."""
+    from ..i18n import set_language
+    code = set_language(setting)
+    logging.getLogger(__name__).info("Interface language: %s (setting: %s)", code, setting)
+    if code == "en":
+        return
+    from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+    path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    app._qt_translators = []
+    for name in ("qtbase", "qt"):
+        tr = QTranslator(app)
+        if tr.load(QLocale(code), name, "_", path):
+            app.installTranslator(tr)
+            app._qt_translators.append(tr)
+
+
 def _excepthook(exc_type, exc, tb):
     import traceback
     msg = "".join(traceback.format_exception(exc_type, exc, tb))
     logging.getLogger("crash").error(msg)
     app = QApplication.instance()
     if app is not None:
-        box = QMessageBox(QMessageBox.Icon.Critical, APP_NAME, f"Unexpected error: {exc}")
+        from ..i18n import _
+        box = QMessageBox(QMessageBox.Icon.Critical, APP_NAME, _("Unexpected error: {error}").format(error=exc))
         box.setDetailedText(msg)
         box.exec()
 
@@ -88,6 +106,7 @@ def run(argv: list[str]) -> int:
     QApplication.setOrganizationName("Yakusuru")
     app = QApplication(argv)
     app.setWindowIcon(QIcon(make_icon()))
+    _install_translations(app, settings.ui_language)
     theme.apply(app, settings.theme, settings.accent)
     theme.watcher = theme.ThemeWatcher(app)       # follow OS light/dark + accent changes live
     try:

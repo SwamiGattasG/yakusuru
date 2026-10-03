@@ -26,7 +26,8 @@ class Language:
 
     @property
     def label(self) -> str:
-        return f"{self.name} — {self.native}" if self.native and self.native != self.name else self.name
+        from .i18n import lang_label          # "Japonés — 日本語" in a Spanish interface
+        return lang_label(self.code, self.name, self.native)
 
     @property
     def whisper(self) -> str:
@@ -117,9 +118,11 @@ def get(code: str | None) -> Language:
 
 
 def name(code: str | None) -> str:
+    """Language name in the interface language ("Japanese", "Japonés", "日本語")."""
+    from .i18n import _
     if code == AUTO:
-        return "Auto-detect"
-    return get(code).name
+        return _("Auto-detect")
+    return _(get(code).name)
 
 
 def source_languages() -> list[Language]:

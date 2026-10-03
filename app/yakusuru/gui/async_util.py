@@ -42,7 +42,7 @@ def run_async(fn: Callable[..., Any], *args, on_done: Callable[[Any], None] | No
     task = _Task(fn, args, kwargs)
     _keep.add(task.signals)
 
-    def _cleanup(*_):
+    def _cleanup(*_a):
         _keep.discard(task.signals)
 
     if on_done:

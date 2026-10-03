@@ -85,7 +85,7 @@ def derive(base: dict, accent_hex: str, dark: bool) -> dict:
         return t
     bg = QColor(t["bg"])
     # Keep accent-colored text readable on the background (e.g. yellow on white, graphite on dark).
-    for _ in range(12):
+    for _i in range(12):
         if _contrast(acc, bg) >= 3.0:
             break
         acc = acc.lighter(112) if dark else acc.darker(112)
@@ -219,7 +219,7 @@ class ThemeWatcher(QObject):
         self._timer.setInterval(250)          # coalesce the burst of events a theme switch produces
         self._timer.timeout.connect(self.refresh)
         try:
-            app.styleHints().colorSchemeChanged.connect(lambda *_: self._timer.start())
+            app.styleHints().colorSchemeChanged.connect(lambda *_a: self._timer.start())
         except Exception:
             pass
         app.installEventFilter(self)

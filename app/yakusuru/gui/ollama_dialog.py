@@ -5,6 +5,7 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QProgressBar, QVBoxLayout
 
 from .widgets import label
+from ..i18n import _
 
 
 class _Worker(QThread):
@@ -24,7 +25,7 @@ class _Worker(QThread):
         try:
             where = install(lambda f, m: self.progress.emit(f, m), lambda: self._cancel)
         except InterruptedError:
-            self.failed.emit("Cancelled.")
+            self.failed.emit(_("Cancelled."))
             return
         except Exception as e:  # noqa: BLE001
             self.failed.emit(f"{type(e).__name__}: {e}")
@@ -37,19 +38,19 @@ class InstallOllamaDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Install Ollama")
+        self.setWindowTitle(_("Install Ollama"))
         self.setMinimumWidth(520)
         v = QVBoxLayout(self)
-        title = QLabel("Installing Ollama — the free, private local translator")
+        title = QLabel(_("Installing Ollama — the free, private local translator"))
         title.setObjectName("H2")
         v.addWidget(title)
-        v.addWidget(label("Downloaded from ollama.com and installed for your user account (no admin "
+        v.addWidget(label(_("Downloaded from ollama.com and installed for your user account (no admin "
                           "password needed). Yakusuru starts it and downloads the translation model "
-                          "the first time you translate.", "Hint"))
+                          "the first time you translate."), "Hint"))
         self.bar = QProgressBar()
         self.bar.setRange(0, 0)
         v.addWidget(self.bar)
-        self.status = QLabel("Connecting…")
+        self.status = QLabel(_("Connecting…"))
         self.status.setObjectName("Hint")
         self.status.setWordWrap(True)
         v.addWidget(self.status)
@@ -78,14 +79,14 @@ class InstallOllamaDialog(QDialog):
     def _failed(self, err: str):
         self.bar.setRange(0, 1)
         self.bar.setValue(0)
-        self.status.setText("✗ " + err + "\n\nYou can also install it manually from ollama.com/download.")
+        self.status.setText("✗ " + err + _("\n\nYou can also install it manually from ollama.com/download."))
         self.buttons.clear()
         self.buttons.addButton(QDialogButtonBox.StandardButton.Close)
         self.buttons.rejected.connect(self.reject)
 
     def _cancel(self):
         if self.worker.isRunning():
-            self.status.setText("Cancelling…")
+            self.status.setText(_("Cancelling…"))
             self.worker.cancel()
             self.worker.wait(5000)
         self.reject()

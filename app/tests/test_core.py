@@ -793,3 +793,37 @@ def test_time_column():
     assert time_text(j) == "1:05"
     j.state, j.seconds = "done", 185
     assert time_text(j) == "3:05"
+
+
+# ----------------------------------------------------------------------------- interface translations
+def test_locales_complete_and_placeholders_match():
+    """Every interface string is translated in every language, with the same {placeholders}."""
+    import re
+    import subprocess as sp
+    sp.run([sys.executable, "tools/extract_strings.py"], check=True, capture_output=True,
+           cwd=Path(__file__).resolve().parents[1])
+    loc = Path(__file__).resolve().parents[1] / "yakusuru" / "locales"
+    keys = json.loads((loc / "_template.json").read_text(encoding="utf-8"))
+    from yakusuru.i18n import UI_LANGUAGES
+    for code in UI_LANGUAGES:
+        if code == "en":
+            continue
+        tr = json.loads((loc / f"{code}.json").read_text(encoding="utf-8"))
+        missing = [k for k in keys if not tr.get(k)]
+        assert not missing, f"{code}: {len(missing)} untranslated, e.g. {missing[:3]}"
+        for k, v in tr.items():
+            assert sorted(re.findall(r"\{\w+\}", k)) == sorted(re.findall(r"\{\w+\}", v)), (code, k, v)
+
+
+def test_set_language_and_fallback():
+    from yakusuru import i18n
+    from yakusuru import languages as L
+    try:
+        assert i18n.set_language("es") == "es"
+        assert i18n._("Add Files") == "Agregar archivos"
+        assert i18n._("Some text nobody translated") == "Some text nobody translated"
+        assert L.name("ja") == "Japonés" and L.get("ja").label == "Japonés — 日本語"
+        assert i18n.set_language("ja") == "ja" and L.get("ja").label == "日本語"
+        assert i18n.set_language("xx") == "en" and i18n._("Add Files") == "Add Files"
+    finally:
+        i18n.set_language("en")

@@ -22,6 +22,7 @@ from ..pipeline import lang_suffixes
 from ..subtitles import Cue, fmt_ts, joiner, parse_ts, read_srt, render_srt
 from . import theme
 from .async_util import run_async
+from ..i18n import _
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class SubtitleEditor(QMainWindow):
         self._load(self.project_path)
         src = self.meta.get("source")
         self.media = media or (Path(src) if src and Path(src).exists() else None)
-        self.setWindowTitle(f"Subtitle Editor — {self.project_path.name}")
+        self.setWindowTitle(_("Subtitle Editor") + f" · {self.project_path.name}")
         self.resize(1200, 780)
         self._build()
         self._fill()
@@ -96,7 +97,7 @@ class SubtitleEditor(QMainWindow):
 
     def _set_dirty(self, d: bool):
         self.dirty = d
-        self.setWindowTitle(("● " if d else "") + f"Subtitle Editor — {self.project_path.name}")
+        self.setWindowTitle(("● " if d else "") + _("Subtitle Editor") + f" · {self.project_path.name}")
 
     # ---------------------------------------------------------------- UI
     def _build(self):
@@ -113,22 +114,22 @@ class SubtitleEditor(QMainWindow):
             tb.addAction(a)
             return a
 
-        act("Save", self.save, QKeySequence.StandardKey.Save, "Save project and rewrite SRT files (Ctrl+S)")
-        act("Undo", self.do_undo, QKeySequence.StandardKey.Undo)
+        act(_("Save"), self.save, QKeySequence.StandardKey.Save, _("Save project and rewrite SRT files (Ctrl+S)"))
+        act(_("Undo"), self.do_undo, QKeySequence.StandardKey.Undo)
         tb.addSeparator()
-        act("Retranslate", self.retranslate_selected, "Ctrl+R", "Translate the selected lines again")
-        act("Insert", self.insert_line, "Ctrl+I", "Insert a line after the selection")
-        act("Split", self.split_line, "Ctrl+K", "Split the selected line in two")
-        act("Merge", self.merge_lines, "Ctrl+M", "Merge selected lines")
-        act("Delete", self.delete_lines, None, "Delete selected lines")
-        act("Shift Time…", self.shift_time, None, "Move selected (or all) lines earlier/later")
+        act(_("Retranslate"), self.retranslate_selected, "Ctrl+R", _("Translate the selected lines again"))
+        act(_("Insert"), self.insert_line, "Ctrl+I", _("Insert a line after the selection"))
+        act(_("Split"), self.split_line, "Ctrl+K", _("Split the selected line in two"))
+        act(_("Merge"), self.merge_lines, "Ctrl+M", _("Merge selected lines"))
+        act(_("Delete"), self.delete_lines, None, _("Delete selected lines"))
+        act(_("Shift Time…"), self.shift_time, None, _("Move selected (or all) lines earlier/later"))
         tb.addSeparator()
         self.find = QLineEdit()
-        self.find.setPlaceholderText("Find…")
+        self.find.setPlaceholderText(_("Find…"))
         self.find.setMaximumWidth(200)
         self.find.returnPressed.connect(self.find_next)
         tb.addWidget(self.find)
-        act("Replace…", self.replace_all, "Ctrl+H")
+        act(_("Replace…"), self.replace_all, "Ctrl+H")
 
         central = QWidget()
         v = QVBoxLayout(central)
@@ -162,11 +163,11 @@ class SubtitleEditor(QMainWindow):
         self.sub_preview.setStyleSheet("font-size: 16px; padding: 6px;")
         tv.addWidget(self.sub_preview)
         ctr = QHBoxLayout()
-        self.btn_play = QPushButton("▶ Play line")
+        self.btn_play = QPushButton(_("▶ Play line"))
         self.btn_play.clicked.connect(self.play_current)
-        self.btn_pause = QPushButton("Pause")
+        self.btn_pause = QPushButton(_("Pause"))
         self.btn_pause.clicked.connect(lambda: self.player and self.player.pause())
-        self.btn_follow = QPushButton("Follow playback")
+        self.btn_follow = QPushButton(_("Follow playback"))
         self.btn_follow.setCheckable(True)
         self.btn_follow.setChecked(True)
         for b in (self.btn_play, self.btn_pause, self.btn_follow):
@@ -182,7 +183,7 @@ class SubtitleEditor(QMainWindow):
         self.table = QTableWidget(0, 5)
         self.src_lang = self.meta.get("source_lang") or "und"
         self.tgt_lang = self.meta.get("target_lang") or self.s.target_lang
-        self.table.setHorizontalHeaderLabels(["#", "Start", "End", f"Original ({lang_name(self.src_lang)})",
+        self.table.setHorizontalHeaderLabels(["#", _("Start"), _("End"), f"Original ({lang_name(self.src_lang)})",
                                               f"Translation ({lang_name(self.tgt_lang)})"])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(COL_N, QHeaderView.ResizeMode.ResizeToContents)
@@ -197,7 +198,7 @@ class SubtitleEditor(QMainWindow):
                                    QAbstractItemView.EditTrigger.EditKeyPressed |
                                    QAbstractItemView.EditTrigger.AnyKeyPressed)
         self.table.itemChanged.connect(self._item_changed)
-        self.table.currentCellChanged.connect(lambda r, *_: self._show_row(r))
+        self.table.currentCellChanged.connect(lambda r, *_a: self._show_row(r))
         split.addWidget(self.table)
         split.setSizes([300 if self.player else 90, 480])
         v.addWidget(split)
@@ -224,18 +225,19 @@ class SubtitleEditor(QMainWindow):
             if c.tgt.startswith("[?]") or not c.tgt.strip():
                 en_item.setBackground(QColor(t["err"]).lighter(170) if not theme.is_dark()
                                       else QColor(t["err"]).darker(300))
-                en_item.setToolTip("Missing or failed translation")
+                en_item.setToolTip(_("Missing or failed translation"))
             elif cps > (9 if get_lang(self.tgt_lang).wide else 20):
                 en_item.setBackground(QColor(t["warn"]).lighter(170) if not theme.is_dark()
                                       else QColor(t["warn"]).darker(300))
-                en_item.setToolTip(f"Fast to read: {cps:.0f} characters/second")
+                en_item.setToolTip(_("Fast to read: {cps} characters/second").format(cps=f"{cps:.0f}"))
             else:
                 en_item.setBackground(QColor(0, 0, 0, 0))
                 en_item.setToolTip("")
         self.table.resizeRowsToContents()
         self._filling = False
         flagged = sum(1 for c in self.cues if c.tgt.startswith("[?]") or (c.src and not c.tgt.strip()))
-        self.info.setText(f"{len(self.cues)} lines" + (f" · {flagged} need attention" if flagged else ""))
+        self.info.setText(_("{n} lines").format(n=len(self.cues))
+                          + (" · " + _("{n} need attention").format(n=flagged) if flagged else ""))
 
     def _item_changed(self, it: QTableWidgetItem):
         if self._filling:
@@ -255,7 +257,7 @@ class SubtitleEditor(QMainWindow):
             elif col == COL_EN:
                 c.tgt = it.text().strip()
         except ValueError:
-            QMessageBox.warning(self, "Invalid time", "Use the format HH:MM:SS,mmm")
+            QMessageBox.warning(self, _("Invalid time"), _("Use the format HH:MM:SS,mmm"))
         if col in (COL_START, COL_END):
             self.cues.sort(key=lambda x: x.start)
         QTimer.singleShot(0, self._fill)
@@ -377,9 +379,9 @@ class SubtitleEditor(QMainWindow):
 
     def shift_time(self):
         rows = self._rows()
-        scope = f"the {len(rows)} selected line(s)" if len(rows) > 1 else "all lines"
-        sec, ok = QInputDialog.getDouble(self, "Shift timing", f"Shift {scope} by seconds "
-                                         "(negative = earlier):", 0.0, -3600, 3600, 3)
+        prompt = (_("Shift the {n} selected lines by seconds (negative = earlier):").format(n=len(rows))
+                  if len(rows) > 1 else _("Shift all lines by seconds (negative = earlier):"))
+        sec, ok = QInputDialog.getDouble(self, _("Shift timing"), prompt, 0.0, -3600, 3600, 3)
         if not ok or sec == 0:
             return
         self._snapshot()
@@ -402,13 +404,13 @@ class SubtitleEditor(QMainWindow):
                 self.table.selectRow(r)
                 self.table.scrollToItem(self.table.item(r, 0))
                 return
-        self.statusBar().showMessage("Not found", 2000)
+        self.statusBar().showMessage(_("Not found"), 2000)
 
     def replace_all(self):
-        q, ok = QInputDialog.getText(self, "Replace", "Find (in both columns):", text=self.find.text())
+        q, ok = QInputDialog.getText(self, _("Replace"), _("Find (in both columns):"), text=self.find.text())
         if not ok or not q:
             return
-        rep, ok = QInputDialog.getText(self, "Replace", f"Replace “{q}” with:")
+        rep, ok = QInputDialog.getText(self, _("Replace"), f"Replace “{q}” with:")
         if not ok:
             return
         self._snapshot()
@@ -427,8 +429,8 @@ class SubtitleEditor(QMainWindow):
         if not rows:
             return
         if self.s.translator == "whisper":
-            QMessageBox.information(self, "Retranslate", "Choose an LLM or DeepL translator on the main "
-                                                          "window to retranslate individual lines.")
+            QMessageBox.information(self, _("Retranslate"), _("Choose an LLM or DeepL translator on the main "
+                                                          "window to retranslate individual lines."))
             return
         from ..translators import get_translator
         snap = Settings()
@@ -449,11 +451,11 @@ class SubtitleEditor(QMainWindow):
             for r in rows:
                 self.cues[r].tgt = res[r - lo]
             self._fill()
-            self.statusBar().showMessage("Retranslated.", 3000)
+            self.statusBar().showMessage(_("Retranslated."), 3000)
 
         def fail(err):
             self.statusBar().clearMessage()
-            QMessageBox.warning(self, "Retranslate failed", err.split("\n")[0])
+            QMessageBox.warning(self, _("Retranslate failed"), err.split("\n")[0])
 
         run_async(work, on_done=done, on_error=fail)
 
@@ -472,7 +474,7 @@ class SubtitleEditor(QMainWindow):
                 o.write_text(render_srt(self.cues, mode, **kw), encoding="utf-8")
                 written.append(o.name)
             except OSError as e:
-                QMessageBox.warning(self, "Save failed", f"{o}: {e}")
+                QMessageBox.warning(self, _("Save failed"), f"{o}: {e}")
         try:
             src = Path(self.meta.get("source") or "")
             if is_project_file(self.project_path):
@@ -487,14 +489,14 @@ class SubtitleEditor(QMainWindow):
                 save_project(self.project_path, src, snap, self.cues, [str(o) for o in outputs],
                              src_lang=self.src_lang)
         except OSError as e:
-            QMessageBox.warning(self, "Save failed", str(e))
+            QMessageBox.warning(self, _("Save failed"), str(e))
             return
         self._set_dirty(False)
-        self.statusBar().showMessage("Saved " + (", ".join(written) if written else self.project_path.name), 4000)
+        self.statusBar().showMessage(_("Saved {files}").format(files=", ".join(written) if written else self.project_path.name), 4000)
 
     def closeEvent(self, e):
         if self.dirty:
-            r = QMessageBox.question(self, "Unsaved changes", "Save changes before closing?",
+            r = QMessageBox.question(self, _("Unsaved changes"), _("Save changes before closing?"),
                                      QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard |
                                      QMessageBox.StandardButton.Cancel)
             if r == QMessageBox.StandardButton.Cancel:
@@ -511,7 +513,7 @@ def _split_lang_suffix(p: Path) -> tuple[str, str | None]:
     """"show.ja.srt" → ("show", "ja"); "show.srt" → ("show", None)."""
     from .. import languages as L
     stem = p.name[:-4] if p.name.lower().endswith(".srt") else p.stem
-    head, _, code = stem.rpartition(".")
+    head, _sep, code = stem.rpartition(".")
     if head and (code in L.BY_CODE or (code and "-" in code and code.split("-")[0] in L.BY_CODE)):
         return head, code
     return stem, None

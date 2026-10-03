@@ -9,6 +9,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from . import theme
+from ..i18n import _
 
 _ids = itertools.count(1)
 
@@ -42,14 +43,14 @@ class Job:
 def running_text(j: "Job") -> str:
     import time
     el = time.time() - j.started if j.started else 0.0
-    parts = [j.message or "Working"]
+    parts = [j.message or _("Working")]
     if j.stage != "downloading":          # download messages carry their own MB / ETA
         parts.append(f"{int(j.progress * 100)}%")
-    parts.append(f"{fmt_duration(el) if el >= 1 else '0:00'} elapsed")
+    parts.append(_("{time} elapsed").format(time=fmt_duration(el) if el >= 1 else "0:00"))
     # Overall ETA once there is enough signal (and not during the one-off model download).
     if j.stage in ("transcribing", "translating", "writing") and j.progress > 0.15 and el > 15 \
             and j.quiet < 30:
-        parts.append(f"~{fmt_duration(el * (1 - j.progress) / j.progress)} left")
+        parts.append(_("~{time} left").format(time=fmt_duration(el * (1 - j.progress) / j.progress)))
     text = " · ".join(parts)
     note = quiet_note(j)
     # Put it first: the cell is often narrow, and this is the part that matters while it waits.
@@ -60,8 +61,8 @@ def quiet_note(j: "Job") -> str:
     """When nothing has moved for a while, say what is actually happening (from the monitor)."""
     if j.state != "running" or j.quiet < 15 or not j.activity:
         return ""
-    head = "⚠ Looks stuck" if j.stalled else "No progress"
-    return f"{head} for {fmt_duration(j.quiet)}: {j.activity}"
+    head = _("⚠ Looks stuck for {time}") if j.stalled else _("No progress for {time}")
+    return head.format(time=fmt_duration(j.quiet)) + ": " + _(j.activity)
 
 
 def time_text(j: "Job") -> str:
@@ -100,7 +101,7 @@ class QueueModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self.COLS[section]
+            return _(self.COLS[section])
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.TextAlignmentRole:
             h = Qt.AlignmentFlag.AlignLeft if section == 0 else Qt.AlignmentFlag.AlignHCenter
             return int(h | Qt.AlignmentFlag.AlignVCenter)
@@ -120,8 +121,8 @@ class QueueModel(QAbstractTableModel):
                 if j.state == "running":
                     return running_text(j)
                 if j.state == "error":
-                    return "Failed — " + j.error.split("\n")[0][:90]
-                return j.message if j.state in ("done", "skipped") and j.message else STATE_LABEL[j.state]
+                    return _("Failed: {error}").format(error=j.error.split("\n")[0][:90])
+                return j.message if j.state in ("done", "skipped") and j.message else _(STATE_LABEL[j.state])
             if col == 3:
                 return time_text(j)
             if col == 4:

@@ -40,6 +40,7 @@ Japanese to English gets extra care, with honorifics, Japanese-tuned models like
 - **Consistent names and terms.** A glossary and short show notes keep character names, honorifics and jargon the same in every episode.
 - **A real subtitle editor.** Preview the video, retime lines, split and merge, find and replace, and re-translate single lines.
 - **Honest about failures.** If a translation comes back in the wrong language, the file is marked as failed instead of quietly saved, and the transcript is kept so you can retry just the translation.
+- **Speaks your language.** The interface is available in English, Spanish and Japanese, and follows your system language automatically.
 - **Feels at home on your desktop.** Follows your system's light or dark mode and accent color, live.
 
 ## Download
@@ -189,6 +190,7 @@ Hugging Face models use the standard cache, `~/.cache/huggingface`. You can chan
 ## Developer notes
 - Run the tests: `python -m pytest app/tests`. They use a dummy engine and an echo translator, so no models are needed.
 - Command-line health check: `python -m yakusuru --doctor`, run from `app/`.
+- **Translating the interface:** each language is one JSON file in `app/yakusuru/locales/`. Run `python tools/extract_strings.py` from `app/` to refresh `_template.json` and see what each language is missing, then copy `es.json`, translate the values, and add the language code to `UI_LANGUAGES` in `yakusuru/i18n.py`. Pull requests for new languages are very welcome.
 - Engines live in `yakusuru/engines/*` and translators in `yakusuru/translators/providers.py`. To add one, add a class and register it in `models.py`.
 
 ## Credits & license

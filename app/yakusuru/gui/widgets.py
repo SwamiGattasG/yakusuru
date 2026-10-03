@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QComboBox, QFrame, QLabel, QStyle, QStyledItemDel
                                QVBoxLayout, QWidget)
 
 from . import theme
+from ..i18n import _
 
 
 class Card(QFrame):
@@ -176,13 +177,13 @@ class DropHint(QWidget):
         f.setPixelSize(17)
         p.setFont(f)
         p.setPen(QColor(t["text"]))
-        p.drawText(r.adjusted(0, 30, 0, 0), Qt.AlignmentFlag.AlignCenter, "Drop videos or audio here")
+        p.drawText(r.adjusted(0, 30, 0, 0), Qt.AlignmentFlag.AlignCenter, _("Drop videos or audio here"))
         f.setBold(False)
         f.setPixelSize(13)
         p.setFont(f)
         p.setPen(QColor(t["muted"]))
         p.drawText(r.adjusted(0, 80, 0, 0), Qt.AlignmentFlag.AlignCenter,
-                   "or click to browse · folders are scanned for media files")
+                   _("or click to browse · folders are scanned for media files"))
 
 
 class LanguageCombo(QComboBox):
@@ -193,7 +194,7 @@ class LanguageCombo(QComboBox):
         from .. import languages as L
         self.setMaxVisibleItems(18)
         if source:
-            self.addItem("Auto-detect", L.AUTO)
+            self.addItem(_("Auto-detect"), L.AUTO)
             self.insertSeparator(self.count())
         pool = L.source_languages() if source else L.target_languages()
         common = [L.get(c) for c in L.COMMON if any(x.code == c for x in pool)]

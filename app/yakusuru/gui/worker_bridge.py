@@ -5,6 +5,7 @@ import logging
 import multiprocessing as mp
 import queue
 
+from ..i18n import _
 from PySide6.QtCore import QObject, QThread, Signal
 
 from ..worker import worker_main
@@ -97,8 +98,8 @@ class WorkerBridge(QObject):
             self._teardown()
             self.current_job = None
             self.event.emit({"type": "error", "id": jid,
-                             "error": f"The processing engine stopped unexpectedly (exit code {code}). "
-                                      "This is usually out-of-memory — try a smaller model.",
+                             "error": _("The processing engine stopped unexpectedly (exit code {code}). "
+                                        "This is usually out of memory, so try a smaller model.").format(code=code),
                              "trace": ""})
 
     def _teardown(self):

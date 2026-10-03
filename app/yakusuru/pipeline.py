@@ -19,6 +19,8 @@ from .languages import get as get_lang
 from .languages import name as lang_name
 from .subtitles import Cue, align_by_overlap, clean_cues, fix_timing, render_srt, resegment
 
+from .i18n import _ as _t
+
 log = logging.getLogger(__name__)
 
 PROJECT_SUFFIX = ".yakusuru.json"
@@ -169,7 +171,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
 
     def breakdown() -> str:
         spent: dict[str, float] = {}
-        ends = [t for _, t in marks[1:]] + [time.time()]
+        ends = [t for _s, t in marks[1:]] + [time.time()]
         for (st, t0), t1 in zip(marks, ends):
             label = STAGE_LABELS.get(st, st)
             spent[label] = spent.get(label, 0.0) + (t1 - t0)
@@ -178,7 +180,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
     if not src.exists():
         raise FileNotFoundError(src)
     if s.overwrite == "skip" and outputs_exist(src, s):
-        emit("skipped", 1.0, "Outputs already exist — skipped")
+        emit("skipped", 1.0, _t("Outputs already exist, skipped"))
         return {"skipped": True, "outputs": []}
 
     whisper_mode = s.translator == "whisper"
@@ -200,7 +202,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
             s2.asr_model = alt
             s = s2
     src_lang = None if s.source_lang == AUTO else s.source_lang     # None until detected
-    src_label = lang_name(s.source_lang) if src_lang else "speech"
+    src_label = lang_name(s.source_lang) if src_lang else _t("speech")
     # Stage weights for the overall progress bar
     w_extract, w_load = 0.05, 0.05
     if whisper_mode:
@@ -227,14 +229,14 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
             cues, src_lang = reused
             duration = max((c.end for c in cues), default=0.0)
             done = w_extract + w_load + w_asr
-            emit("transcribing", done / total_w, "Reusing saved transcript")
+            emit("transcribing", done / total_w, _t("Reusing saved transcript"))
             log.info("Reusing the saved %s transcript (%d lines) — skipping transcription.",
                      lang_name(src_lang), len(cues))
         else:
             # 1. audio -----------------------------------------------------------
-            emit("extracting", 0.0, "Extracting audio")
+            emit("extracting", 0.0, _t("Extracting audio"))
             wav = tmpdir / "audio.wav"
-            audio.extract_audio(src, wav, progress=stage("extracting", w_extract, "Extracting audio"),
+            audio.extract_audio(src, wav, progress=stage("extracting", w_extract, _t("Extracting audio")),
                                 cancelled=cancelled)
             done += w_extract
             pcm = audio.load_wav(wav)
@@ -248,7 +250,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
                 ensure_model(s.engine, s.asr_model,
                              lambda f, msg: emit("downloading", (done + w_load * 0.5 * f) / total_w, msg),
                              cancelled)
-                emit("loading", (done + w_load * 0.5) / total_w, f"Loading {short} into memory")
+                emit("loading", (done + w_load * 0.5) / total_w, _t("Loading {model} into memory").format(model=short))
             engine = cache.get(s)
             log.info("Engine: %s · model %s · device %s", s.engine, s.asr_model, engine.device_used)
             entry = find_asr(s.engine, s.asr_model)
@@ -261,7 +263,8 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
 
             # 3. transcription ---------------------------------------------------
             if want_src:
-                msg = f"Transcribing {src_label}" if src_lang else "Detecting language & transcribing"
+                msg = (_t("Transcribing {language}").format(language=src_label) if src_lang
+                       else _t("Detecting language & transcribing"))
                 emit("transcribing", done / total_w, msg)
                 cues = engine.transcribe(pcm, str(wav), duration, "transcribe",
                                          stage("transcribing", w_asr, msg), cancelled)
@@ -295,13 +298,13 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
                     cache.release()                       # one big model in memory at a time
                     from .model_fetch import ensure_model
                     ensure_model(s.engine, alt,
-                                 lambda f, msg: emit("downloading", done / total_w, f"{msg} (for translation)"),
+                                 lambda f, msg: emit("downloading", done / total_w, msg + " " + _t("(for translation)")),
                                  cancelled)
-                    emit("loading", done / total_w, f"Loading {alt.split('/')[-1]} for translation")
+                    emit("loading", done / total_w, _t("Loading {model} for translation").format(model=alt.split('/')[-1]))
                     tr_engine = cache.get(s_tr)
-                emit("translating", done / total_w, "Whisper → English")
+                emit("translating", done / total_w, _t("Whisper → English"))
                 tr_cues = tr_engine.transcribe(pcm, str(wav), duration, "translate",
-                                               stage("translating", w_asr_tr, "Whisper → English"), cancelled)
+                                               stage("translating", w_asr_tr, _t("Whisper → English")), cancelled)
                 engine = tr_engine
                 if not src_lang:
                     src_lang = engine.detected_language
@@ -332,10 +335,10 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
                 tr.prepare(lambda m: emit("preparing", here / total_w, m), cancelled)
                 todo = [i for i, c in enumerate(cues) if not c.tgt.strip() or c.tgt.startswith("[?]")]
                 if todo:
-                    pair = f"{lang_name(src_lang) if src_lang else 'source'} → {lang_name(s.target_lang)}"
-                    emit("translating", done / total_w, f"Translating {pair}")
+                    pair = f"{lang_name(src_lang) if src_lang else _t('source')} → {lang_name(s.target_lang)}"
+                    emit("translating", done / total_w, _t("Translating {pair}").format(pair=pair))
                     log.info("Translating %d lines %s with %s (%s)", len(todo), pair, s.translator, tr.model)
-                    prog = stage("translating", w_tr, f"Translating {pair}")
+                    prog = stage("translating", w_tr, _t("Translating {pair}").format(pair=pair))
                     try:
                         if len(todo) == len(cues):
                             out = tr.translate([c.src for c in cues], glossary_terms, prog, cancelled,
@@ -379,7 +382,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
                             share * 100, lang_name(s.target_lang), lang_name(src_lang))
 
         # 6. write ---------------------------------------------------------------
-        emit("writing", done / total_w, "Writing subtitles")
+        emit("writing", done / total_w, _t("Writing subtitles"))
         plan = plan_outputs(src, s, src_lang)
         kw = dict(src_lang=src_lang, tgt_lang=s.target_lang, max_chars=s.max_line_chars,
                   max_chars_cjk=s.max_line_chars_cjk, max_lines=s.max_lines)
@@ -402,7 +405,7 @@ def process(src: Path, s: Settings, cache: EngineCache, emit: Emit, cancelled: C
         speed = f" · {duration / max(1, elapsed):.1f}× realtime" if duration else ""
         parts = breakdown()
         log.info("✓ Done %s — total %s%s%s", src.name, fmt_clock(elapsed), speed, f"  ({parts})" if parts else "")
-        emit("done", 1.0, f"Done in {fmt_clock(elapsed)}")
+        emit("done", 1.0, _t("Done in {time}").format(time=fmt_clock(elapsed)))
         return {"outputs": outputs, "project": str(plan.project), "lines": len(cues), "seconds": elapsed,
                 "source_lang": src_lang, "breakdown": breakdown()}
     finally:

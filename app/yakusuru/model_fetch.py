@@ -16,6 +16,8 @@ from typing import Callable
 
 from .models import find_asr
 
+from .i18n import _ as _t
+
 log = logging.getLogger(__name__)
 
 # Only the files each engine actually loads (keeps downloads lean).
@@ -116,7 +118,7 @@ def ensure_model(engine: str, model_id: str, progress: Progress, cancelled: Call
 
     from . import netcheck
     short = repo.split("/")[-1]
-    progress(0.0, f"Connecting to Hugging Face to download {short}…")
+    progress(0.0, _t("Connecting to Hugging Face to download {model}…").format(model=short))
     log.info("%s isn't on this computer yet — checking the connection to %s…", short, constants.ENDPOINT)
     ok, detail = netcheck.check(constants.ENDPOINT)
     if not ok:
@@ -125,7 +127,7 @@ def ensure_model(engine: str, model_id: str, progress: Progress, cancelled: Call
     if cancelled():
         raise InterruptedError()
 
-    progress(0.0, f"Looking up {short} on Hugging Face…")
+    progress(0.0, _t("Looking up {model} on Hugging Face…").format(model=short))
     plan: list = []
     def _list():
         try:
@@ -143,7 +145,8 @@ def ensure_model(engine: str, model_id: str, progress: Progress, cancelled: Call
     mb_total = total / 1e6
     log.info("Downloading model %s (%s) — first use only…", repo,
              f"{mb_total:,.0f} MB" if total else "size unknown")
-    progress(0.0, f"Downloading model · 0 / {mb_total:,.0f} MB" if total else "Downloading model…")
+    progress(0.0, _t("Downloading model · {done} / {total} MB").format(done=0, total=f"{mb_total:,.0f}") if total
+             else _t("Downloading model…"))
 
     cache = _repo_cache(repo)
     start_bytes = _bytes_in(cache)
@@ -172,16 +175,16 @@ def ensure_model(engine: str, model_id: str, progress: Progress, cancelled: Call
         if total:
             frac = min(0.99, done / total)
             eta = (total - done) / rate if rate > 0 else 0
-            msg = f"Downloading model · {done / 1e6:,.0f} / {mb_total:,.0f} MB"
+            msg = _t("Downloading model · {done} / {total} MB").format(done=f"{done / 1e6:,.0f}", total=f"{mb_total:,.0f}")
             if rate > 0 and done > 5e6:
-                msg += f" · {rate / 1e6:,.1f} MB/s · ~{_fmt(eta)} left"
+                msg += f" · {rate / 1e6:,.1f} MB/s · " + _t("~{time} left").format(time=_fmt(eta))
             progress(frac, msg)
         else:
-            progress(0.0, f"Downloading model · {done / 1e6:,.0f} MB")
+            progress(0.0, _t("Downloading model · {done} MB").format(done=f"{done / 1e6:,.0f}"))
     if err:
         raise RuntimeError(f"Model download failed for {repo}: {err[0]}") from err[0]
     log.info("Model downloaded in %s.", _fmt(time.time() - t0))
-    progress(1.0, "Model downloaded")
+    progress(1.0, _t("Model downloaded"))
 
 
 def _fmt(sec: float) -> str:

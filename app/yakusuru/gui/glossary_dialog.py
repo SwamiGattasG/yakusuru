@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog, QHBoxLayo
 from .. import glossary
 from ..glossary import Term
 from .widgets import label
+from ..i18n import _
 
 
 class TermTable(QWidget):
@@ -18,7 +19,7 @@ class TermTable(QWidget):
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 8, 0, 0)
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Japanese", "English", "Note for the translator"])
+        self.table.setHorizontalHeaderLabels([_("Japanese"), _("English"), _("Note for the translator")])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -29,8 +30,8 @@ class TermTable(QWidget):
             self._append(t)
         v.addWidget(self.table)
         h = QHBoxLayout()
-        for text, slot in [("Add", lambda: self._append(Term("", ""), edit=True)), ("Remove", self._remove),
-                           ("Import CSV…", self._import), ("Export CSV…", self._export)]:
+        for text, slot in [(_("Add"), lambda: self._append(Term("", ""), edit=True)), (_("Remove"), self._remove),
+                           (_("Import CSV…"), self._import), (_("Export CSV…"), self._export)]:
             b = QPushButton(text)
             b.clicked.connect(slot)
             h.addWidget(b)
@@ -59,7 +60,7 @@ class TermTable(QWidget):
         return out
 
     def _import(self):
-        f, _ = QFileDialog.getOpenFileName(self, "Import glossary", "", "CSV (*.csv *.tsv *.txt)")
+        f, _unused = QFileDialog.getOpenFileName(self, _("Import glossary"), "", "CSV (*.csv *.tsv *.txt)")
         if not f:
             return
         with open(f, encoding="utf-8-sig", newline="") as fh:
@@ -71,7 +72,7 @@ class TermTable(QWidget):
                     self._append(Term(row[0].strip(), row[1].strip(), row[2].strip() if len(row) > 2 else ""))
 
     def _export(self):
-        f, _ = QFileDialog.getSaveFileName(self, "Export glossary", "glossary.csv", "CSV (*.csv)")
+        f, _unused = QFileDialog.getSaveFileName(self, _("Export glossary"), _("glossary.csv"), "CSV (*.csv)")
         if not f:
             return
         with open(f, "w", encoding="utf-8-sig", newline="") as fh:
@@ -85,17 +86,17 @@ class GlossaryDialog(QDialog):
     def __init__(self, media: Path | None = None, parent=None):
         super().__init__(parent)
         self.media = media
-        self.setWindowTitle("Glossary")
+        self.setWindowTitle(_("Glossary"))
         self.setMinimumSize(760, 520)
         v = QVBoxLayout(self)
-        v.addWidget(label("Names and terms the translator must keep consistent. Character notes "
+        v.addWidget(label(_("Names and terms the translator must keep consistent. Character notes "
                           "(gender, how they speak) help LLMs choose pronouns and tone. "
                           "Per-file entries override global ones.  Example: 田中 → Tanaka (note: \"female, "
-                          "the narrator\") · 魔法学園 → Magic Academy", "Hint"))
+                          "the narrator\") · 魔法学園 → Magic Academy"), "Hint"))
         self.tabs = QTabWidget()
         g = glossary.load_global()
         self.global_tab = TermTable(g)
-        self.tabs.addTab(self.global_tab, "All files")
+        self.tabs.addTab(self.global_tab, _("All files"))
         self.file_tab = None
         if media is not None:
             self.file_tab = TermTable(glossary.load_sidecar(media))

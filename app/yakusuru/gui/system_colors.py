@@ -86,7 +86,7 @@ def _windows() -> str | None:
     try:
         import winreg  # type: ignore
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\DWM") as k:
-            val, _ = winreg.QueryValueEx(k, "AccentColor")       # 0xAABBGGRR
+            val, _unused = winreg.QueryValueEx(k, "AccentColor")       # 0xAABBGGRR
         r, g, b = val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF
         return f"#{r:02X}{g:02X}{b:02X}"
     except Exception:

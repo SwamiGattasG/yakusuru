@@ -27,6 +27,7 @@ from .queue_model import QueueModel, fmt_duration, quiet_note
 from .. import languages as L
 from .widgets import Card, DropHint, LanguageCombo, ModelCombo, ProgressDelegate, StatusDot, label
 from .worker_bridge import WorkerBridge
+from ..i18n import _
 
 log = logging.getLogger(__name__)
 
@@ -105,40 +106,40 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ UI build
     def _build_menu(self):
         mb = self.menuBar()
-        m_file = mb.addMenu("&File")
-        self.act_add = QAction("Add Files…", self, shortcut=QKeySequence.StandardKey.Open)
+        m_file = mb.addMenu(_("&File"))
+        self.act_add = QAction(_("Add Files…"), self, shortcut=QKeySequence.StandardKey.Open)
         self.act_add.triggered.connect(self.add_files_dialog)
         m_file.addAction(self.act_add)
-        a = QAction("Add Folder…", self)
+        a = QAction(_("Add Folder…"), self)
         a.setMenuRole(QAction.MenuRole.NoRole)
         a.triggered.connect(self.add_folder_dialog)
         m_file.addAction(a)
         m_file.addSeparator()
-        a = QAction("Open Subtitle Project…", self, shortcut="Ctrl+E")
+        a = QAction(_("Open Subtitle Project…"), self, shortcut="Ctrl+E")
         a.setMenuRole(QAction.MenuRole.NoRole)
         a.triggered.connect(self.open_project_dialog)
         m_file.addAction(a)
         m_file.addSeparator()
-        self.act_stop = QAction("Stop", self, shortcut=QKeySequence("Ctrl+."))
+        self.act_stop = QAction(_("Stop"), self, shortcut=QKeySequence("Ctrl+."))
         self.act_stop.setMenuRole(QAction.MenuRole.NoRole)
         self.act_stop.setEnabled(False)
         self.act_stop.triggered.connect(self.stop)
         m_file.addAction(self.act_stop)
         m_file.addSeparator()
-        a = QAction("Quit", self, shortcut=QKeySequence.StandardKey.Quit)
+        a = QAction(_("Quit"), self, shortcut=QKeySequence.StandardKey.Quit)
         a.setMenuRole(QAction.MenuRole.QuitRole)
         a.triggered.connect(self.close)
         m_file.addAction(a)
 
-        m_tools = mb.addMenu("&Tools")
+        m_tools = mb.addMenu(_("&Tools"))
         for text, slot, sc in [
-            ("Setup Wizard…", self.open_wizard, None),
-            ("Settings…", self.open_settings, QKeySequence.StandardKey.Preferences),
-            ("Glossary…", self.open_glossary, "Ctrl+G"),
+            (_("Setup Wizard…"), self.open_wizard, None),
+            (_("Settings…"), self.open_settings, QKeySequence.StandardKey.Preferences),
+            (_("Glossary…"), self.open_glossary, "Ctrl+G"),
             (None, None, None),
-            ("Test Translator", self.test_translator, None),
-            ("System Report", self.show_doctor, None),
-            ("Open Logs Folder", lambda: self._reveal(paths.logs_dir()), None),
+            (_("Test Translator"), self.test_translator, None),
+            (_("System Report"), self.show_doctor, None),
+            (_("Open Logs Folder"), lambda: self._reveal(paths.logs_dir()), None),
         ]:
             if text is None:
                 m_tools.addSeparator()
@@ -152,7 +153,7 @@ class MainWindow(QMainWindow):
                             else QAction.MenuRole.NoRole)
             act.triggered.connect(slot)
             m_tools.addAction(act)
-        m_help = mb.addMenu("&Help")
+        m_help = mb.addMenu(_("&Help"))
         a = QAction(f"About {APP_NAME}", self)
         a.setMenuRole(QAction.MenuRole.AboutRole)
         a.triggered.connect(self.about)
@@ -166,20 +167,20 @@ class MainWindow(QMainWindow):
 
         # Header ------------------------------------------------------------
         header = QHBoxLayout()
-        mark = QLabel("訳")
+        mark = QLabel(_("訳"))
         mark.setObjectName("BrandMark")
         brand = QLabel(APP_NAME)
         brand.setObjectName("Brand")
-        sub = QLabel("訳する · AI subtitles in any language")
+        sub = QLabel(_("訳する · AI subtitles in any language"))
         sub.setObjectName("Muted")
         header.addWidget(mark)
         header.addWidget(brand)
         header.addSpacing(8)
         header.addWidget(sub)
         header.addStretch(1)
-        for text, slot in [("Add Files", self.add_files_dialog), ("Add Folder", self.add_folder_dialog),
-                           ("Glossary", self.open_glossary), ("Editor", self.open_project_dialog),
-                           ("Setup", self.open_wizard), ("Settings", self.open_settings)]:
+        for text, slot in [(_("Add Files"), self.add_files_dialog), (_("Add Folder"), self.add_folder_dialog),
+                           (_("Glossary"), self.open_glossary), (_("Editor"), self.open_project_dialog),
+                           (_("Setup"), self.open_wizard), (_("Settings"), self.open_settings)]:
             b = QPushButton(text)
             b.clicked.connect(slot)
             header.addWidget(b)
@@ -189,7 +190,7 @@ class MainWindow(QMainWindow):
         split.setChildrenCollapsible(False)
 
         # Queue card ------------------------------------------------------------
-        qcard = Card("Queue")
+        qcard = Card(_("Queue"))
         self.stack = QStackedWidget()
         self.drop_hint = DropHint()
         self.drop_hint.clicked.connect(self.add_files_dialog)
@@ -229,10 +230,10 @@ class MainWindow(QMainWindow):
         qcard.add(self.stack)
 
         qbar = QHBoxLayout()
-        for text, slot, tip in [("Remove", self.remove_selected, "Remove selected files (Del)"),
-                                ("↑", lambda: self._move(-1), "Move up"),
-                                ("↓", lambda: self._move(1), "Move down"),
-                                ("Clear finished", self.model.clear_finished, "")]:
+        for text, slot, tip in [(_("Remove"), self.remove_selected, _("Remove selected files (Del)")),
+                                ("↑", lambda: self._move(-1), _("Move up")),
+                                ("↓", lambda: self._move(1), _("Move down")),
+                                (_("Clear finished"), self.model.clear_finished, "")]:
             b = QPushButton(text)
             b.setObjectName("Ghost")
             b.setToolTip(tip)
@@ -258,82 +259,82 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(0, 0, 0, 0)
         sl.setSpacing(12)
 
-        asr = Card("1 · Transcribe")
+        asr = Card(_("1 · Transcribe"))
         self.asr_card = asr
         f = QFormLayout()
         f.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         f.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.cb_src = LanguageCombo(source=True)
-        self.cb_src.setToolTip("Language spoken in the media. Auto-detect works, but choosing it is "
-                               "faster and more reliable.")
-        f.addRow("Spoken", self.cb_src)
+        self.cb_src.setToolTip(_("Language spoken in the media. Auto-detect works, but choosing it is "
+                               "faster and more reliable."))
+        f.addRow(_("Spoken"), self.cb_src)
         self.cb_engine = QComboBox()
         self.cb_asr_model = ModelCombo()
         self.asr_hint = label("", "Hint")
-        f.addRow("Engine", self.cb_engine)
-        f.addRow("Model", self.cb_asr_model)
+        f.addRow(_("Engine"), self.cb_engine)
+        f.addRow(_("Model"), self.cb_asr_model)
         asr.lay.addLayout(f)
         asr.add(self.asr_hint)
         sl.addWidget(asr)
 
-        tr = Card("2 · Translate")
+        tr = Card(_("2 · Translate"))
         self.tr_card = tr
         f = QFormLayout()
         f.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        self.ck_translate = QCheckBox("Translate the transcript")
-        self.ck_translate.setToolTip("Turn off to only transcribe. You can translate later: "
-                                     "right-click a finished file → Translate Now (the transcript is reused).")
+        self.ck_translate = QCheckBox(_("Translate the transcript"))
+        self.ck_translate.setToolTip(_("Turn off to only transcribe. You can translate later: "
+                                     "right-click a finished file → Translate Now (the transcript is reused)."))
         f.addRow(self.ck_translate)
         self.cb_tgt = LanguageCombo(source=False)
-        f.addRow("Into", self.cb_tgt)
+        f.addRow(_("Into"), self.cb_tgt)
         self.cb_translator = QComboBox()
         for k, v in TRANSLATORS.items():
-            self.cb_translator.addItem(v, k)
+            self.cb_translator.addItem(_(v), k)
         self.cb_tr_model = ModelCombo()
         self.cb_content = QComboBox()
         for k, v in CONTENT_TYPES.items():
-            self.cb_content.addItem(v, k)
+            self.cb_content.addItem(_(v), k)
         self.cb_honor = QComboBox()
-        self.cb_honor.addItem("Keep (Tanaka-san)", "keep")
-        self.cb_honor.addItem("Localize (Mr. Tanaka)", "localize")
-        f.addRow("Translator", self.cb_translator)
-        f.addRow("Model", self.cb_tr_model)
-        f.addRow("Content", self.cb_content)
-        f.addRow("Honorifics", self.cb_honor)
+        self.cb_honor.addItem(_("Keep (Tanaka-san)"), "keep")
+        self.cb_honor.addItem(_("Localize (Mr. Tanaka)"), "localize")
+        f.addRow(_("Translator"), self.cb_translator)
+        f.addRow(_("Model"), self.cb_tr_model)
+        f.addRow(_("Content"), self.cb_content)
+        f.addRow(_("Honorifics"), self.cb_honor)
         self.honor_label = f.labelForField(self.cb_honor)
         tr.lay.addLayout(f)
         self.tr_hint = label("", "Hint")
         tr.add(self.tr_hint)
         self.notes = QPlainTextEdit()
-        self.notes.setPlaceholderText("Optional notes for the translator — show title, characters, "
-                                      "who speaks how… (e.g. \"Yuki is a girl; Ren speaks rudely\")")
+        self.notes.setPlaceholderText(_("Optional notes for the translator — show title, characters, "
+                                      "who speaks how… (e.g. \"Yuki is a girl; Ren speaks rudely\")"))
         self.notes.setFixedHeight(58)
         tr.add(self.notes)
         sl.addWidget(tr)
 
-        out = Card("3 · Output")
+        out = Card(_("3 · Output"))
         row = QHBoxLayout()
-        self.ck_en = QCheckBox("Translation")
-        self.ck_ja = QCheckBox("Original")
-        self.ck_bi = QCheckBox("Bilingual")
-        self.ck_en.setToolTip("Subtitles in the target language")
-        self.ck_ja.setToolTip("The transcript in the spoken language")
-        self.ck_bi.setToolTip("Original line above its translation, in one file")
+        self.ck_en = QCheckBox(_("Translation"))
+        self.ck_ja = QCheckBox(_("Original"))
+        self.ck_bi = QCheckBox(_("Bilingual"))
+        self.ck_en.setToolTip(_("Subtitles in the target language"))
+        self.ck_ja.setToolTip(_("The transcript in the spoken language"))
+        self.ck_bi.setToolTip(_("Original line above its translation, in one file"))
         for w in (self.ck_en, self.ck_ja, self.ck_bi):
             row.addWidget(w)
         row.addStretch(1)
         out.lay.addLayout(row)
         frow = QHBoxLayout()
-        self.ck_furi = QCheckBox("Furigana")
-        self.ck_furi.setToolTip("Also write Japanese subtitles with kana readings over the kanji")
+        self.ck_furi = QCheckBox(_("Furigana"))
+        self.ck_furi.setToolTip(_("Also write Japanese subtitles with kana readings over the kanji"))
         self.cb_furi = QComboBox()
-        self.cb_furi.addItem("Inline — 漢字（かんじ） in .furigana.srt", "inline")
-        self.cb_furi.addItem("Ruby — real furigana in .vtt", "ruby")
-        self.cb_furi.addItem("Both files", "both")
-        self.cb_furi.setToolTip("Inline works in every player. Ruby shows small kana above the kanji in "
-                                "browsers and WebVTT players that support it; others show the plain text.")
-        self.btn_furi_install = QPushButton("Install (80 MB)")
-        self.btn_furi_install.setToolTip("Installs SudachiPy and its Japanese dictionary, used to read the kanji")
+        self.cb_furi.addItem(_("Inline — 漢字（かんじ） in .furigana.srt"), "inline")
+        self.cb_furi.addItem(_("Ruby — real furigana in .vtt"), "ruby")
+        self.cb_furi.addItem(_("Both files"), "both")
+        self.cb_furi.setToolTip(_("Inline works in every player. Ruby shows small kana above the kanji in "
+                                "browsers and WebVTT players that support it; others show the plain text."))
+        self.btn_furi_install = QPushButton(_("Install (80 MB)"))
+        self.btn_furi_install.setToolTip(_("Installs SudachiPy and its Japanese dictionary, used to read the kanji"))
         self.btn_furi_install.clicked.connect(self._install_furigana)
         frow.addWidget(self.ck_furi)
         frow.addWidget(self.cb_furi, 1)
@@ -345,13 +346,13 @@ class MainWindow(QMainWindow):
         sl.addStretch(1)
 
         run_row = QHBoxLayout()
-        self.btn_start = QPushButton("Start")
+        self.btn_start = QPushButton(_("Start"))
         self.btn_start.setObjectName("Primary")
         self.btn_start.setMinimumHeight(40)
         self.btn_start.clicked.connect(self.start)
-        self.btn_stop = QPushButton("■  Stop")
-        self.btn_stop.setToolTip("Cancel the file being processed (⌘.). Its transcript so far is kept "
-                                 "if transcription had finished.")
+        self.btn_stop = QPushButton(_("■  Stop"))
+        self.btn_stop.setToolTip(_("Cancel the file being processed (⌘.). Its transcript so far is kept "
+                                 "if transcription had finished."))
         self.btn_stop.setObjectName("Danger")
         self.btn_stop.setMinimumHeight(40)
         self.btn_stop.setEnabled(False)
@@ -387,7 +388,7 @@ class MainWindow(QMainWindow):
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(5000)
-        self.log_view.setPlaceholderText("Log")
+        self.log_view.setPlaceholderText(_("Log"))
         f = self.log_view.font()
         f.setFamily("Menlo" if sys.platform == "darwin" else "Consolas" if os.name == "nt" else "Monospace")
         f.setStyleHint(f.StyleHint.Monospace)
@@ -407,7 +408,7 @@ class MainWindow(QMainWindow):
         hl.setContentsMargins(8, 0, 0, 0)
         hl.addWidget(self.dot)
         hl.addWidget(self.status_label)
-        self.btn_fix = QPushButton("Open Setup Wizard")
+        self.btn_fix = QPushButton(_("Open Setup Wizard"))
         self.btn_fix.setObjectName("Primary")
         self.btn_fix.clicked.connect(self.open_wizard)
         self.btn_fix.hide()
@@ -440,7 +441,7 @@ class MainWindow(QMainWindow):
         self.cb_engine.blockSignals(True)
         self.cb_engine.clear()
         for k, v in ENGINES.items():
-            self.cb_engine.addItem(v, k)
+            self.cb_engine.addItem(_(v), k)
         i = self.cb_engine.findData(self.s.engine)
         self.cb_engine.setCurrentIndex(max(0, i))
         self.cb_engine.blockSignals(False)
@@ -498,8 +499,8 @@ class MainWindow(QMainWindow):
         if tkey == "ollama":
             installed = set(models)
             if cur and cur not in installed and f"{cur}:latest" not in installed:
-                self.tr_hint.setText(f"⚠ '{cur}' is not installed in Ollama yet. Installed: "
-                                     + ", ".join(models[:6]) + ("…" if len(models) > 6 else ""))
+                self.tr_hint.setText(_("⚠ '{model}' is not installed in Ollama yet. Installed: {list}").format(
+                    model=cur, list=", ".join(models[:6]) + ("…" if len(models) > 6 else "")))
 
     def _engine_changed(self):
         self._fill_asr_models()
@@ -537,60 +538,66 @@ class MainWindow(QMainWindow):
         from ..models import find_asr
         s = self.s
         src, tgt = s.source_lang, s.target_lang
-        src_name = L.name(src) if src != L.AUTO else "Detected language"
+        src_name = L.name(src) if src != L.AUTO else _("Detected language")
         tgt_name = L.name(tgt)
         self.asr_card.findChild(QLabel, "CardTitle").setText(
-            "1 · Transcribe" + (f" {L.name(src)}" if src != L.AUTO else " (auto-detect language)"))
-        self.tr_card.findChild(QLabel, "CardTitle").setText(f"2 · Translate into {tgt_name}")
+            _("1 · Transcribe {language}").format(language=L.name(src)) if src != L.AUTO
+            else _("1 · Transcribe (auto-detect language)"))
+        self.tr_card.findChild(QLabel, "CardTitle").setText(_("2 · Translate into {language}").format(language=tgt_name))
         m = find_asr(s.engine, s.asr_model)
-        hint = m.notes if m and m.notes else ""
+        hint = _(m.notes) if m and m.notes else ""
         if m and m.languages and src not in m.languages:
             only = ", ".join(L.name(x) for x in m.languages)
-            hint = (f"⚠ This model is trained for {only} only — use large-v3 or turbo for "
-                    + (f"{L.name(src)}." if src != L.AUTO else "auto-detect."))
+            hint = (_("⚠ This model is trained for {languages} only. Use large-v3 or turbo for {language}.")
+                    .format(languages=only, language=L.name(src)) if src != L.AUTO else
+                    _("⚠ This model is trained for {languages} only. Use large-v3 or turbo for auto-detect.")
+                    .format(languages=only))
         self.asr_hint.setText(hint)
         self.asr_hint.setVisible(bool(hint))
         t = s.translator
         hint = ""
         if t == "whisper":
             from ..models import can_whisper_translate, find_asr as _fa, whisper_translate_model
-            hint = "Fast and offline, but literal. For natural English, an LLM translator (Claude, Grok…) is better."
+            hint = _("Fast and offline, but literal. For natural English, an LLM translator (Claude, Grok…) is better.")
             if tgt not in L.WHISPER_TRANSLATE_TARGETS:
-                hint = f"⚠ Whisper can only translate into English, not {tgt_name}. Pick another translator."
+                hint = _("⚠ Whisper can only translate into English, not {language}. Pick another translator.").format(
+                    language=tgt_name)
             elif not can_whisper_translate(s.engine, s.asr_model):
                 alt = whisper_translate_model(s.engine)
                 am = _fa(s.engine, alt) if alt else None
                 short = s.asr_model.split("/")[-1]
-                hint = (f"{short} can't translate, so the English pass runs with large-v3 instead "
-                        f"({am.size_gb:.1f} GB, downloaded once; slower than turbo). " if am else
-                        f"⚠ {short} can't do Whisper's translation. Pick an LLM translator. ") + \
-                       "For natural English, an LLM translator is better."
+                hint = (_("{model} can't translate, so the English pass runs with large-v3 instead "
+                          "({size} GB, downloaded once; slower than turbo).").format(model=short, size=f"{am.size_gb:.1f}")
+                        if am else _("⚠ {model} can't do Whisper's translation. Pick an LLM translator.").format(
+                            model=short)) + " " + _("For natural English, an LLM translator is better.")
         elif t == "deepl" and (not L.get(tgt).deepl_tgt or (src != L.AUTO and not L.get(src).deepl_src)):
             bad = tgt_name if not L.get(tgt).deepl_tgt else L.name(src)
-            hint = f"⚠ DeepL doesn't support {bad}. An LLM translator handles any language."
+            hint = _("⚠ DeepL doesn't support {language}. An LLM translator handles any language.").format(language=bad)
         elif t in ("anthropic", "openai", "gemini", "xai", "deepl"):
             from ..keystore import has_key
             if not has_key(t):
-                hint = "⚠ No API key yet — add it in Settings → API keys."
+                hint = _("⚠ No API key yet — add it in Settings → API keys.")
             else:
-                hint = "Sends the subtitle text (never audio) to the provider."
+                hint = _("Sends the subtitle text (never audio) to the provider.")
         elif t == "ollama":
             from ..hardware import _ram_gb
             from ..models import OLLAMA_MODEL_GB, recommended_ollama_model
             ram = _ram_gb() or 0
             need = OLLAMA_MODEL_GB.get(s.model_for("ollama"))
-            hint = "Runs locally via Ollama. Lines are translated in context batches."
+            hint = _("Runs locally via Ollama. Lines are translated in context batches.")
             if ram and need and need > ram * 0.5:
-                hint = (f"⚠ {s.model_for('ollama')} needs ~{need:.0f} GB of this computer's {ram:.0f} GB, which "
-                        f"makes everything sluggish. Try {recommended_ollama_model(ram)}, or a cloud "
-                        "translator (Claude, Grok…) which uses no local memory.")
+                hint = _("⚠ {model} needs ~{need} GB of this computer's {ram} GB, which makes everything "
+                         "sluggish. Try {lighter}, or a cloud translator (Claude, Grok…) which uses no local "
+                         "memory.").format(model=s.model_for("ollama"), need=f"{need:.0f}", ram=f"{ram:.0f}",
+                                           lighter=recommended_ollama_model(ram))
         if src != L.AUTO and src.split("-")[0] == tgt.split("-")[0] and "-" not in tgt:
-            hint = f"Spoken and target language are both {tgt_name}: you'll get a transcript, no translation."
+            hint = _("Spoken and target language are both {language}: you'll get a transcript, no translation.").format(
+                language=tgt_name)
         on = s.translate
         if not on:
-            hint = ("Transcript only. To translate later, right-click a finished file → Translate Now "
-                    "(the transcript is reused, nothing is transcribed again).")
-            self.tr_card.findChild(QLabel, "CardTitle").setText("2 · Translate (off)")
+            hint = (_("Transcript only. To translate later, right-click a finished file → Translate Now "
+                    "(the transcript is reused, nothing is transcribed again)."))
+            self.tr_card.findChild(QLabel, "CardTitle").setText(_("2 · Translate (off)"))
         self.tr_hint.setText(hint)
         self.tr_hint.setVisible(bool(hint))
         for w in (self.cb_tgt, self.cb_translator, self.cb_tr_model, self.cb_content, self.cb_honor, self.notes,
@@ -601,7 +608,7 @@ class MainWindow(QMainWindow):
         self.cb_content.setEnabled(t not in ("whisper",))
         self.cb_tr_model.setEnabled(t not in ("whisper",))      # Whisper translates with the speech model
         if t == "whisper" and self.cb_tr_model.lineEdit():
-            self.cb_tr_model.lineEdit().setPlaceholderText("Uses the speech model")
+            self.cb_tr_model.lineEdit().setPlaceholderText(_("Uses the speech model"))
         honor = src.split("-")[0] in ("ja", "ko", L.AUTO) and t not in ("whisper", "deepl")
         self.cb_honor.setVisible(honor)
         if self.honor_label:
@@ -614,15 +621,15 @@ class MainWindow(QMainWindow):
         # Output labels follow the chosen languages.
         sc = src if src != L.AUTO else "xx"
         self.ck_en.setText(f"{tgt_name}")
-        self.ck_ja.setText(f"{src_name if src != L.AUTO else 'Original'}")
-        self.ck_bi.setText("Bilingual")
+        self.ck_ja.setText(src_name if src != L.AUTO else _("Original"))
+        self.ck_bi.setText(_("Bilingual"))
         if s.output_mode == "folder" and s.output_folder:
-            where = f"Saved to {s.output_folder}"
+            where = _("Saved to {folder}").format(folder=s.output_folder)
         else:
-            where = "Saved next to each source file"
+            where = _("Saved next to each source file")
         names = (f"name.{tgt}.srt / name.{sc}.srt / name.{sc}-{tgt}.srt" if translate else f"name.{sc}.srt")
         if src == L.AUTO:
-            names += " (xx = detected language)"
+            names += _(" (xx = detected language)")
         # Furigana: only when one of the outputs is Japanese.
         from .. import furigana
         ja_out = (src.split("-")[0] == "ja" or src == L.AUTO) or (translate and tgt.split("-")[0] == "ja")
@@ -630,20 +637,20 @@ class MainWindow(QMainWindow):
         self.ck_furi.setEnabled(ja_out)
         self.cb_furi.setEnabled(ja_out and self.ck_furi.isChecked())
         self.btn_furi_install.setVisible(ja_out and self.ck_furi.isChecked() and not have)
-        self.ck_furi.setToolTip("Also write Japanese subtitles with kana readings over the kanji" if ja_out else
-                                "Furigana is for Japanese subtitles — none of this job's outputs is Japanese")
+        self.ck_furi.setToolTip(_("Also write Japanese subtitles with kana readings over the kanji") if ja_out else
+                                _("Furigana is for Japanese subtitles — none of this job's outputs is Japanese"))
         if ja_out and self.ck_furi.isChecked():
             style = self.cb_furi.currentData()
             extra = {"inline": f"name.ja.furigana.srt", "ruby": "name.ja.vtt",
                      "both": "name.ja.furigana.srt + name.ja.vtt"}.get(style, "")
-            names += f" + {extra}" + ("" if have else " (needs the Install button)")
+            names += f" + {extra}" + ("" if have else _(" (needs the Install button)"))
         self.out_hint.setText(f"{where} as {names}")
 
     def _install_furigana(self):
         from PySide6.QtWidgets import QProgressDialog
         from .. import furigana
-        dlg = QProgressDialog("Installing the Japanese reading dictionary (SudachiPy, ~80 MB)…", None, 0, 0, self)
-        dlg.setWindowTitle("Furigana")
+        dlg = QProgressDialog(_("Installing the Japanese reading dictionary (SudachiPy, ~80 MB)…"), None, 0, 0, self)
+        dlg.setWindowTitle(_("Furigana"))
         dlg.setMinimumDuration(0)
         dlg.setCancelButton(None)
         dlg.show()
@@ -666,7 +673,7 @@ class MainWindow(QMainWindow):
                 self._log("INFO", "Furigana ready.")
             else:
                 self._log("ERROR", "Couldn't install the furigana dictionary:\n" + out)
-                QMessageBox.warning(self, "Furigana", "The install failed — see the log for details.")
+                QMessageBox.warning(self, _("Furigana"), _("The install failed — see the log for details."))
             self._update_hints()
 
         def failed(err):
@@ -683,20 +690,21 @@ class MainWindow(QMainWindow):
         ff = audio.find_ffmpeg()
         if not ff:
             self.dot.set_color(t["err"])
-            self.status_label.setText("ffmpeg is missing.")
+            self.status_label.setText(_("ffmpeg is missing."))
             self.btn_fix.show()
         elif ok:
             self.dot.set_color(t["ok"])
             self.btn_fix.hide()
-            self.status_label.setText(f"{ENGINES.get(eng, eng)} ready · {platform.system()} {platform.machine()}")
+            self.status_label.setText(_("{engine} ready").format(engine=_(ENGINES.get(eng, eng)))
+                                      + f" · {platform.system()} {platform.machine()}")
         else:
             self.dot.set_color(t["warn"])
-            self.status_label.setText(f"{ENGINES.get(eng, eng)}: {why}.")
+            self.status_label.setText(f"{_(ENGINES.get(eng, eng))}: {_(why)}.")
             self.btn_fix.show()
         for i in range(self.cb_engine.count()):
             k = self.cb_engine.itemData(i)
-            good, _ = engine_status(k)
-            self.cb_engine.setItemText(i, ENGINES[k] + ("" if good else "  (not installed)"))
+            good, _unused = engine_status(k)
+            self.cb_engine.setItemText(i, _(ENGINES[k]) + ("" if good else _("  (not installed)")))
 
     # ------------------------------------------------------------------ queue ops
     def add_paths(self, paths_in: list[Path]):
@@ -708,14 +716,14 @@ class MainWindow(QMainWindow):
             elif p.suffix.lower() in audio.MEDIA_EXTS:
                 files.append(p)
         if not files:
-            self.statusBar().showMessage("No media files found in what you dropped.", 4000)
+            self.statusBar().showMessage(_("No media files found in what you dropped."), 4000)
             return
         new = self.model.add(files)
         for job in new:
             run_async(audio.probe_duration, job.path,
                       on_done=lambda d, jid=job.id: self._set_duration(jid, d))
         if new:
-            self.statusBar().showMessage(f"Added {len(new)} file(s)", 3000)
+            self.statusBar().showMessage(_("Added {n} file(s)").format(n=len(new)), 3000)
 
     def _set_duration(self, jid, d):
         j = self.model.job(jid)
@@ -726,11 +734,11 @@ class MainWindow(QMainWindow):
 
     def add_files_dialog(self):
         exts = " ".join(f"*{e}" for e in sorted(audio.MEDIA_EXTS))
-        files, _ = QFileDialog.getOpenFileNames(self, "Add media files", "", f"Media ({exts});;All files (*)")
+        files, _unused = QFileDialog.getOpenFileNames(self, _("Add media files"), "", _("Media") + f" ({exts});;" + _("All files") + " (*)")
         self.add_paths([Path(f) for f in files])
 
     def add_folder_dialog(self):
-        d = QFileDialog.getExistingDirectory(self, "Add folder")
+        d = QFileDialog.getExistingDirectory(self, _("Add folder"))
         if d:
             self.add_paths([Path(d)])
 
@@ -748,20 +756,20 @@ class MainWindow(QMainWindow):
         for r in new_rows:
             self.table.selectRow(r)
 
-    def _update_queue_view(self, *_):
+    def _update_queue_view(self, *_a):
         self.stack.setCurrentIndex(1 if self.model.jobs else 0)
         jobs = self.model.jobs
         q = sum(1 for j in jobs if j.state == "queued")
         d = sum(1 for j in jobs if j.state == "done")
         e = sum(1 for j in jobs if j.state == "error")
         total = sum(j.duration or 0 for j in jobs if j.state in ("queued", "running"))
-        parts = [f"{len(jobs)} file(s)"]
+        parts = [_("{n} file(s)").format(n=len(jobs))]
         if q:
-            parts.append(f"{q} queued ({fmt_duration(total)})")
+            parts.append(_("{n} queued ({time})").format(n=q, time=fmt_duration(total)))
         if d:
-            parts.append(f"{d} done")
+            parts.append(_("{n} done").format(n=d))
         if e:
-            parts.append(f"{e} failed")
+            parts.append(_("{n} failed").format(n=e))
         self.queue_summary.setText(" · ".join(parts) if jobs else "")
 
     def _queue_menu(self, pos):
@@ -774,25 +782,25 @@ class MainWindow(QMainWindow):
         # context-menu event can crash Qt on macOS (QWindow::geometry on a destroyed window).
         m = self._ctx_menu
         m.clear()
-        a = m.addAction("Open in Subtitle Editor")
+        a = m.addAction(_("Open in Subtitle Editor"))
         a.setEnabled(bool(job.project) and Path(job.project).exists())
         a.triggered.connect(lambda: self.open_job_in_editor(row))
-        m.addAction("Show in Folder").triggered.connect(lambda: self._reveal(
+        m.addAction(_("Show in Folder")).triggered.connect(lambda: self._reveal(
             Path(job.outputs[0]) if job.outputs else job.path))
-        m.addAction("Per-file Glossary…").triggered.connect(lambda: self.open_glossary(job.path))
+        m.addAction(_("Per-file Glossary…")).triggered.connect(lambda: self.open_glossary(job.path))
         m.addSeparator()
         if job.state == "running":
-            m.addAction("Stop").triggered.connect(self.stop)
+            m.addAction(_("Stop")).triggered.connect(self.stop)
         if job.state in ("error", "cancelled", "done", "skipped"):
-            label = "Run Again"
+            label = _("Run Again")
             if self.s.translate and job.state == "done" and not any(
                     o.endswith(f".{self.s.target_lang}.srt") for o in job.outputs):
-                label = "Translate Now (reuses the transcript)"
+                label = _("Translate Now (reuses the transcript)")
             m.addAction(label).triggered.connect(lambda: self._requeue(job.id))
         if job.error:
-            m.addAction("Copy Error Details").triggered.connect(
+            m.addAction(_("Copy Error Details")).triggered.connect(
                 lambda: QApplication.clipboard().setText(job.error + "\n\n" + job.trace))
-        m.addAction("Remove").triggered.connect(self.remove_selected)
+        m.addAction(_("Remove")).triggered.connect(self.remove_selected)
         m.popup(self.table.viewport().mapToGlobal(pos))
 
     def _requeue(self, jid):
@@ -807,33 +815,35 @@ class MainWindow(QMainWindow):
     def _preflight(self) -> str | None:
         s = self.s
         if s.translate and not (s.out_translation or s.out_original or s.out_bilingual):
-            return "Choose at least one output (translation, original or bilingual)."
+            return _("Choose at least one output (translation, original or bilingual).")
         if not s.translate:
             return self._preflight_engine()
         if (s.translator == "whisper" and s.target_lang not in L.WHISPER_TRANSLATE_TARGETS
                 and (s.out_translation or s.out_bilingual)):
-            return (f"Whisper's built-in translation only produces English, not {L.name(s.target_lang)}.\n\n"
-                    "Choose Ollama, a cloud translator or DeepL for other languages.")
+            return _("Whisper's built-in translation only produces English, not {language}.\n\n"
+                     "Choose Ollama, a cloud translator or DeepL for other languages.").format(
+                language=L.name(s.target_lang))
         if s.translator == "deepl" and (s.out_translation or s.out_bilingual):
             if not L.get(s.target_lang).deepl_tgt or (s.source_lang != L.AUTO and not L.get(s.source_lang).deepl_src):
-                return ("DeepL doesn't support this language pair.\n\n"
-                        "Choose Ollama or a cloud LLM translator — they handle any language.")
+                return (_("DeepL doesn't support this language pair.\n\n"
+                        "Choose Ollama or a cloud LLM translator — they handle any language."))
         problem = self._preflight_engine()
         if problem:
             return problem
         if s.translator in ("anthropic", "openai", "gemini", "xai", "deepl") and (s.out_translation or s.out_bilingual):
             from ..keystore import has_key
             if not has_key(s.translator):
-                return f"No API key for {TRANSLATORS[s.translator]}. Add one in Settings → API keys."
+                return _("No API key for {service}. Add one in Settings → API keys.").format(
+                    service=_(TRANSLATORS[s.translator]))
         return None
 
     def _preflight_engine(self) -> str | None:
         if not audio.find_ffmpeg():
-            return "ffmpeg is missing. Click Setup in the toolbar to install it."
+            return _("ffmpeg is missing. Click Setup in the toolbar to install it.")
         ok, why = engine_status(self.s.engine)
         if not ok:
-            return (f"The {ENGINES.get(self.s.engine)} engine isn't installed ({why}).\n"
-                    "Click Setup in the toolbar to install it.")
+            return _("The {engine} engine isn't installed ({reason}).\nClick Setup in the toolbar to install it.").format(
+                engine=_(ENGINES.get(self.s.engine, self.s.engine)), reason=why)
         return None
 
     def start(self):
@@ -843,7 +853,7 @@ class MainWindow(QMainWindow):
             return
         problem = self._preflight()
         if problem:
-            QMessageBox.warning(self, "Can't start yet", problem)
+            QMessageBox.warning(self, _("Can't start yet"), problem)
             return
         if not self._ensure_ollama():
             return
@@ -865,14 +875,14 @@ class MainWindow(QMainWindow):
             return True
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Question)
-        box.setWindowTitle("Install Ollama?")
-        box.setText("Ollama, the free local translator, isn't installed yet.")
-        box.setInformativeText("Yakusuru can install it for you now (a few hundred MB, no admin password). "
-                               "Afterwards it starts automatically and downloads the translation model "
-                               f"({s.model_for('ollama')}) on first use.")
-        install = box.addButton("Install Ollama", QMessageBox.ButtonRole.AcceptRole)
+        box.setWindowTitle(_("Install Ollama?"))
+        box.setText(_("Ollama, the free local translator, isn't installed yet."))
+        box.setInformativeText(_("Yakusuru can install it for you now (a few hundred MB, no admin password). "
+                                 "Afterwards it starts automatically and downloads the translation model "
+                                 "({model}) on first use.").format(model=s.model_for("ollama")))
+        install = box.addButton(_("Install Ollama"), QMessageBox.ButtonRole.AcceptRole)
         install.setObjectName("Primary")
-        other = box.addButton("Use Another Translator", QMessageBox.ButtonRole.ActionRole)
+        other = box.addButton(_("Use Another Translator"), QMessageBox.ButtonRole.ActionRole)
         box.addButton(QMessageBox.StandardButton.Cancel)
         box.setDefaultButton(install)
         box.exec()
@@ -906,7 +916,7 @@ class MainWindow(QMainWindow):
         self.bridge.cancel()          # kills the worker process: works even mid-download or mid-load
         for j in self.model.jobs:             # in case the worker had already gone
             if j.state == "running":
-                j.state, j.message = "cancelled", "Stopped"
+                j.state, j.message = "cancelled", _("Stopped")
                 self.model.changed(j.id)
         self._set_running_ui(False)
         self.overall.setText("")
@@ -923,13 +933,14 @@ class MainWindow(QMainWindow):
             failed = sum(1 for j in self.model.jobs if j.state == "error")
             self.overall.setText("")
             took = time.time() - self._queue_started if getattr(self, "_queue_started", 0) else 0
-            msg = (f"Queue finished — {done} done" + (f", {failed} failed" if failed else "")
-                   + (f" · total time {fmt_duration(max(1, took))}" if took else ""))
+            msg = (_("Queue finished: {n} done").format(n=done)
+                   + (_(", {n} failed").format(n=failed) if failed else "")
+                   + (_(" · total time {time}").format(time=fmt_duration(max(1, took))) if took else ""))
             self.statusBar().showMessage(msg, 10000)
             self._log("INFO", msg)
             QApplication.alert(self)
             return
-        job.state, job.progress, job.message, job.stage = "running", 0.0, "Starting", "starting"
+        job.state, job.progress, job.message, job.stage = "running", 0.0, _("Starting"), "starting"
         job.started = time.time()
         self.model.changed(job.id)
         self._log("INFO", f"▶ {job.path.name}")
@@ -963,7 +974,7 @@ class MainWindow(QMainWindow):
         elif typ == "done":
             if ev.get("skipped"):
                 job.state = "skipped"
-                job.message = "Skipped — outputs exist"
+                job.message = _("Skipped — outputs exist")
             else:
                 job.state = "done"
                 job.outputs = ev.get("outputs", [])
@@ -990,7 +1001,7 @@ class MainWindow(QMainWindow):
                 self._log("WARNING", f"■ Stopped {job.path.name} after {fmt_duration(max(1, job.seconds))} "
                                      f"(during: {job.message or job.stage or 'start'}).")
             job.state = "cancelled"
-            job.message = "Stopped"
+            job.message = _("Stopped")
             job.quiet, job.activity, job.stalled = 0.0, "", False
         self.model.changed(job.id)
         self._update_queue_view()
@@ -1058,7 +1069,7 @@ class MainWindow(QMainWindow):
                 self._open_editor(p, job.path)
 
     def open_project_dialog(self):
-        f, _ = QFileDialog.getOpenFileName(self, "Open subtitle project", "",
+        f, _unused = QFileDialog.getOpenFileName(self, _("Open subtitle project"), "",
                                            "Yakusuru project (*.yakusuru.json *.langinterp.json);;"
                                            "SRT subtitles (*.srt)")
         if f:
@@ -1074,8 +1085,8 @@ class MainWindow(QMainWindow):
         from ..translators import get_translator
         tkey = self.s.translator
         if tkey == "whisper":
-            QMessageBox.information(self, "Test", "Whisper translation runs during transcription — "
-                                                  "nothing to test here.")
+            QMessageBox.information(self, _("Test"), _("Whisper translation runs during transcription — "
+                                                  "nothing to test here."))
             return
         snap = Settings()
         snap.update(self.s.to_dict())
@@ -1084,14 +1095,14 @@ class MainWindow(QMainWindow):
         def done(res):
             sample, out = res
             self.statusBar().clearMessage()
-            QMessageBox.information(self, "Translator works",
+            QMessageBox.information(self, _("Translator works"),
                                     f"{TRANSLATORS[tkey]} ({snap.model_for(tkey)})\n"
                                     f"{L.name(snap.source_lang)} → {L.name(snap.target_lang)}\n\n"
                                     f"{sample}\n→ {out}")
 
         def fail(err):
             self.statusBar().clearMessage()
-            QMessageBox.warning(self, "Translator test failed", err.split("\n")[0])
+            QMessageBox.warning(self, _("Translator test failed"), err.split("\n")[0])
 
         run_async(lambda: get_translator(tkey, snap).test(), on_done=done, on_error=fail)
 
@@ -1103,8 +1114,8 @@ class MainWindow(QMainWindow):
                + f"\nTheme: {'dark' if theme.is_dark() else 'light'}, accent {theme.current()['accent']} "
                f"({describe()})")
         box = QMessageBox(self)
-        box.setWindowTitle("System Report")
-        box.setText("System report (copied to clipboard):")
+        box.setWindowTitle(_("System Report"))
+        box.setText(_("System report (copied to clipboard):"))
         box.setDetailedText(txt)
         QApplication.clipboard().setText(txt)
         box.exec()
@@ -1112,11 +1123,11 @@ class MainWindow(QMainWindow):
     def about(self):
         QMessageBox.about(self, APP_NAME,
                           f"<b>{APP_NAME}</b> {__version__}<br>"
-                          "AI subtitles in any language.<br><br>"
-                          f"Created by {AUTHOR}<br>"
-                          f'<a href="{HOMEPAGE}">{HOMEPAGE.replace("https://", "")}</a> · MIT License<br><br>'
-                          f"Python {platform.python_version()} · {platform.system()} {platform.machine()}<br>"
-                          f"Data folder: {paths.data_dir()}")
+                          + _("AI subtitles in any language.") + "<br><br>"
+                          + _("Created by {author}").format(author=AUTHOR) + "<br>"
+                          + f'<a href="{HOMEPAGE}">{HOMEPAGE.replace("https://", "")}</a> · MIT License<br><br>'
+                          + f"Python {platform.python_version()} · {platform.system()} {platform.machine()}<br>"
+                          + _("Data folder: {path}").format(path=paths.data_dir()))
 
     def _reveal(self, p: Path):
         p = Path(p)
@@ -1145,7 +1156,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, e):
         if self.bridge.busy():
-            r = QMessageBox.question(self, "Quit?", "A file is being processed. Stop it and quit?")
+            r = QMessageBox.question(self, _("Quit?"), _("A file is being processed. Stop it and quit?"))
             if r != QMessageBox.StandardButton.Yes:
                 e.ignore()
                 return

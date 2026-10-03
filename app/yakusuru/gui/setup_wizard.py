@@ -24,6 +24,7 @@ from ..models import ASR_MODELS, ENGINES, TRANSLATOR_MODELS
 from . import theme
 from .async_util import run_async
 from .widgets import Card, ModelCombo, StatusDot, label
+from ..i18n import _
 
 log = logging.getLogger(__name__)
 APP_ROOT = Path(__file__).resolve().parents[2]   # .../app  (contains the yakusuru package)
@@ -132,25 +133,25 @@ class WelcomePage(QWizardPage):
     def __init__(self, wiz: "SetupWizard"):
         super().__init__()
         self.wiz = wiz
-        self.setTitle(f"Welcome to {APP_NAME}")
-        self.setSubTitle("Let's get your computer ready to transcribe and translate media. "
-                         "This takes a few minutes; everything is installed into the app's own environment.")
+        self.setTitle(_("Welcome to {app}").format(app=APP_NAME))
+        self.setSubTitle(_("Let's get your computer ready to transcribe and translate media. "
+                         "This takes a few minutes; everything is installed into the app's own environment."))
         v = QVBoxLayout(self)
-        card = Card("Your system")
-        self.report = QLabel("Detecting hardware…")
+        card = Card(_("Your system"))
+        self.report = QLabel(_("Detecting hardware…"))
         self.report.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         f = self.report.font()
         f.setFamily("Menlo" if sys.platform == "darwin" else "Consolas" if os.name == "nt" else "Monospace")
         self.report.setFont(f)
         card.add(self.report)
         v.addWidget(card)
-        prof = Card("Acceleration profile")
+        prof = Card(_("Acceleration profile"))
         self.profile = QComboBox()
         for k, lab in PROFILES.items():
-            self.profile.addItem(lab, k)
+            self.profile.addItem(_(lab), k)
         prof.add(self.profile)
-        prof.add(label("Only profiles that work on this OS and CPU architecture are listed. The recommended "
-                       "one is pre-selected; it decides which engines are installed next.", "Hint"))
+        prof.add(label(_("Only profiles that work on this OS and CPU architecture are listed. The recommended "
+                       "one is pre-selected; it decides which engines are installed next."), "Hint"))
         v.addWidget(prof)
         self.warn = label("", "")
         self.warn.hide()
@@ -164,15 +165,15 @@ class WelcomePage(QWizardPage):
         # Only offer profiles that exist for this OS + CPU architecture.
         self.profile.clear()
         for k in (hw.profiles or list(PROFILES)):
-            self.profile.addItem(PROFILES[k] + ("  — recommended" if k == hw.recommended else ""), k)
+            self.profile.addItem(_(PROFILES[k]) + (_("  (recommended)") if k == hw.recommended else ""), k)
         cur = self.wiz.s.hardware_profile if self.wiz.s.hardware_profile in (hw.profiles or PROFILES) \
             else hw.recommended
         self.profile.setCurrentIndex(max(0, self.profile.findData(cur)))
         t = theme.current()
         if not hw.python_ok:
-            self.warn.setText(f"<b style='color:{t['err']}'>Python problem:</b> {hw.python_note}<br>"
-                              "Quit, then run the launcher again "
-                              "(macOS: <i>Install or Repair.command</i>) — it will rebuild the environment.")
+            self.warn.setText(f"<b style='color:{t['err']}'>" + _("Python problem:") + f"</b> {hw.python_note}<br>"
+                              + _("Quit, then run the launcher again (macOS: <i>Install or Repair.command</i>). "
+                                  "It will rebuild the environment."))
             self.warn.show()
         elif hw.notes:
             self.warn.setText("<br>".join(hw.notes))
@@ -185,7 +186,7 @@ class WelcomePage(QWizardPage):
     def validatePage(self):
         hw = self.wiz.hw
         if hw is not None and not hw.python_ok:
-            r = QMessageBox.warning(self, "Unsupported Python", hw.python_note +
+            r = QMessageBox.warning(self, _("Unsupported Python"), hw.python_note +
                                     "\n\nComponents can't be installed with this Python. Continue anyway?",
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if r != QMessageBox.StandardButton.Yes:
@@ -210,12 +211,12 @@ class ComponentRow(QWidget):
         self.check.setChecked(comp.recommended and comp.available and not comp.manual)
         self.check.setEnabled(comp.available and not comp.manual)
         self.dot = StatusDot()
-        title = QLabel(f"<b>{comp.title}</b>  <span style='color:{theme.current()['muted']}'>{comp.size}</span>"
-                       + ("  <span style='color:%s'>recommended</span>" % theme.current()["accent"]
+        title = QLabel(f"<b>{_(comp.title)}</b>  <span style='color:{theme.current()['muted']}'>{comp.size}</span>"
+                       + (f"  <span style='color:{theme.current()['accent']}'>" + _("recommended") + "</span>"
                           if comp.recommended else ""))
-        desc = label(comp.description if comp.available else f"{comp.description} ({comp.unavailable_reason})",
+        desc = label(_(comp.description) if comp.available else f"{_(comp.description)} ({_(comp.unavailable_reason)})",
                      "Hint")
-        self.state = QLabel("checking…")
+        self.state = QLabel(_("checking…"))
         self.state.setObjectName("Hint")
         self.actions = QHBoxLayout()
         g.addWidget(self.check, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
@@ -231,7 +232,7 @@ class ComponentRow(QWidget):
     def set_status(self, ok: bool, detail: str):
         t = theme.current()
         self.dot.set_color(t["ok"] if ok else (t["warn"] if self.comp.recommended else t["muted"]))
-        self.state.setText(("Installed · " if ok else "") + detail)
+        self.state.setText((_("Installed · ") if ok else "") + detail)
         if ok and not self.comp.manual:
             self.check.setChecked(False)
 
@@ -240,8 +241,8 @@ class ComponentsPage(QWizardPage):
     def __init__(self, wiz: "SetupWizard"):
         super().__init__()
         self.wiz = wiz
-        self.setTitle("Install components")
-        self.setSubTitle("Tick what you want and press Install. Green means ready.")
+        self.setTitle(_("Install components"))
+        self.setSubTitle(_("Tick what you want and press Install. Green means ready."))
         v = QVBoxLayout(self)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -251,15 +252,15 @@ class ComponentsPage(QWizardPage):
         self.scroll.setWidget(self.rows_host)
         v.addWidget(self.scroll, 3)
         bar = QHBoxLayout()
-        self.btn_install = QPushButton("Install selected")
+        self.btn_install = QPushButton(_("Install selected"))
         self.btn_install.setObjectName("Primary")
         self.btn_install.clicked.connect(self.install)
-        self.btn_cancel = QPushButton("Cancel install")
+        self.btn_cancel = QPushButton(_("Cancel install"))
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(lambda: self.runner.cancel())
-        self.force = QCheckBox("Force-reinstall PyTorch")
-        self.force.setToolTip("Use when switching between the CPU and GPU builds of PyTorch")
-        self.btn_refresh = QPushButton("Re-check")
+        self.force = QCheckBox(_("Force-reinstall PyTorch"))
+        self.force.setToolTip(_("Use when switching between the CPU and GPU builds of PyTorch"))
+        self.btn_refresh = QPushButton(_("Re-check"))
         self.btn_refresh.clicked.connect(self.refresh)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1)
@@ -277,7 +278,7 @@ class ComponentsPage(QWizardPage):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(4000)
-        self.log.setPlaceholderText("Installer output appears here.")
+        self.log.setPlaceholderText(_("Installer output appears here."))
         v.addWidget(self.log, 2)
         self.runner = CommandQueue(self)
         self.runner.output.connect(self._out)
@@ -305,34 +306,34 @@ class ComponentsPage(QWizardPage):
         key = row.comp.key
         if key == "whispercpp":
             if sys.platform == "darwin" and shutil.which("brew"):
-                b = QPushButton("Install with Homebrew")
+                b = QPushButton(_("Install with Homebrew"))
                 b.clicked.connect(lambda: self._run([("Homebrew: whisper-cpp", shutil.which("brew"),
                                                       ["install", "whisper-cpp"])]))
                 row.actions.addWidget(b)
-            b = QPushButton("Download prebuilt…")
+            b = QPushButton(_("Download prebuilt…"))
             b.clicked.connect(self._download_whispercpp)
             row.actions.addWidget(b)
-            b = QPushButton("Locate whisper-cli…")
+            b = QPushButton(_("Locate whisper-cli…"))
             b.clicked.connect(self._locate_whispercpp)
             row.actions.addWidget(b)
-            b = QPushButton("Build instructions")
+            b = QPushButton(_("Build instructions"))
             b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/ggml-org/whisper.cpp#vulkan-gpu-support")))
             row.actions.addWidget(b)
             row.actions.addStretch(1)
         elif key == "ollama":
-            b = QPushButton("Install Ollama")
+            b = QPushButton(_("Install Ollama"))
             b.setObjectName("Primary")
-            b.setToolTip("Downloads Ollama from ollama.com and installs it for your account (no admin needed)")
+            b.setToolTip(_("Downloads Ollama from ollama.com and installs it for your account (no admin needed)"))
             b.clicked.connect(self._install_ollama)
             row.actions.addWidget(b)
-            b = QPushButton("Start Ollama")
+            b = QPushButton(_("Start Ollama"))
             b.clicked.connect(self._start_ollama)
             row.actions.addWidget(b)
             row.actions.addStretch(1)
 
     def refresh(self):
         for r in self.rows.values():
-            r.state.setText("checking…")
+            r.state.setText(_("checking…"))
         s = self.wiz.s
 
         def work():
@@ -368,7 +369,7 @@ class ComponentsPage(QWizardPage):
                 for args in row.comp.commands:
                     cmds.append(pip_cmd(row.comp.title, args, self.force.isChecked()))
         if not cmds:
-            QMessageBox.information(self, "Nothing selected", "Tick at least one component to install.")
+            QMessageBox.information(self, _("Nothing selected"), _("Tick at least one component to install."))
             return
         self._run(cmds)
 
@@ -385,7 +386,7 @@ class ComponentsPage(QWizardPage):
         self.progress.setValue(self.progress.maximum())
         self.btn_install.setEnabled(True)
         self.btn_cancel.setEnabled(False)
-        self.step_label.setText("All done ✓" if ok else "Finished with errors — see log")
+        self.step_label.setText(_("All done ✓") if ok else _("Finished with errors — see log"))
         if not ok:
             self._out("\nSome steps failed. Common fixes: check your internet connection, make sure you "
                       "have a few GB free, then press Install again.\n")
@@ -393,7 +394,7 @@ class ComponentsPage(QWizardPage):
 
     # --- whisper.cpp ------------------------------------------------------
     def _locate_whispercpp(self):
-        f, _ = QFileDialog.getOpenFileName(self, "Locate whisper-cli", str(Path.home()))
+        f, _unused = QFileDialog.getOpenFileName(self, _("Locate whisper-cli"), str(Path.home()))
         if f:
             self.wiz.s.whispercpp_binary = f
             self.wiz.s.save()
@@ -421,8 +422,8 @@ class ComponentsPage(QWizardPage):
                                                    "vulkan" not in a[0].lower()))
             names = [f"{a[0]}  ({a[2] / 1e6:.0f} MB)" for a in ranked]
             choice, ok = QInputDialog.getItem(self, f"whisper.cpp {tag}",
-                                              "Choose a build (Vulkan = AMD/Intel GPU, cuBLAS = NVIDIA, "
-                                              "BLAS/plain = CPU):", names, 0, False)
+                                              _("Choose a build (Vulkan = AMD/Intel GPU, cuBLAS = NVIDIA, "
+                                              "BLAS/plain = CPU):"), names, 0, False)
             if not ok:
                 return
             name, url, _size = ranked[names.index(choice)]
@@ -466,7 +467,7 @@ class ComponentsPage(QWizardPage):
         from ..ollama_install import is_installed, start
         ol = self.wiz.ollama_state or {}
         if ol.get("running"):
-            QMessageBox.information(self, "Ollama", "Ollama is already running.")
+            QMessageBox.information(self, _("Ollama"), _("Ollama is already running."))
             return
         if not is_installed():
             self._install_ollama()
@@ -484,37 +485,37 @@ class ModelsPage(QWizardPage):
     def __init__(self, wiz: "SetupWizard"):
         super().__init__()
         self.wiz = wiz
-        self.setTitle("Choose and download models")
-        self.setSubTitle("Models download once and are reused. You can change them any time on the main window.")
+        self.setTitle(_("Choose and download models"))
+        self.setSubTitle(_("Models download once and are reused. You can change them any time on the main window."))
         v = QVBoxLayout(self)
 
-        asr = Card("Speech recognition")
+        asr = Card(_("Speech recognition"))
         f = QFormLayout()
         self.engine = QComboBox()
         for k, lab in ENGINES.items():
-            self.engine.addItem(lab, k)
+            self.engine.addItem(_(lab), k)
         self.model = ModelCombo()
-        f.addRow("Engine", self.engine)
-        f.addRow("Model", self.model)
+        f.addRow(_("Engine"), self.engine)
+        f.addRow(_("Model"), self.model)
         asr.lay.addLayout(f)
         h = QHBoxLayout()
-        self.btn_dl = QPushButton("Download model now")
+        self.btn_dl = QPushButton(_("Download model now"))
         self.btn_dl.clicked.connect(self.download_asr)
         self.dl_state = QLabel("")
         self.dl_state.setObjectName("Hint")
         h.addWidget(self.btn_dl)
         h.addWidget(self.dl_state, 1)
         asr.lay.addLayout(h)
-        asr.add(label("<b>large-v3</b> and <b>turbo</b> handle ~100 languages. For Japanese: "
+        asr.add(label(_("<b>large-v3</b> and <b>turbo</b> handle ~100 languages. For Japanese: "
                       "<b>kotoba-whisper</b> is fast and accurate for clean speech; "
                       "<b>anime-whisper</b> (Transformers engine) excels at emotive anime dialogue. "
-                      "Both are Japanese-only.", "Hint"))
+                      "Both are Japanese-only."), "Hint"))
         v.addWidget(asr)
 
-        tr = Card("Translation")
-        self.rb_ollama = QRadioButton("Local LLM via Ollama — free && private")
-        self.rb_cloud = QRadioButton("Cloud API (Claude, Grok, OpenAI, Gemini, DeepL) — best quality, light on your Mac, needs a key")
-        self.rb_whisper = QRadioButton("Whisper built-in — fastest, most literal")
+        tr = Card(_("Translation"))
+        self.rb_ollama = QRadioButton(_("Local LLM via Ollama — free && private"))
+        self.rb_cloud = QRadioButton(_("Cloud API (Claude, Grok, OpenAI, Gemini, DeepL) — best quality, light on your Mac, needs a key"))
+        self.rb_whisper = QRadioButton(_("Whisper built-in — fastest, most literal"))
         grp = QButtonGroup(self)
         for rb in (self.rb_ollama, self.rb_cloud, self.rb_whisper):
             grp.addButton(rb)
@@ -522,13 +523,13 @@ class ModelsPage(QWizardPage):
         oh = QHBoxLayout()
         self.ollama_model = ModelCombo()
         self.ollama_model.set_items(TRANSLATOR_MODELS["ollama"], wiz.s.translator_models.get("ollama", "qwen3:14b"))
-        self.btn_pull = QPushButton("Pull model")
+        self.btn_pull = QPushButton(_("Pull model"))
         self.btn_pull.clicked.connect(self.pull)
         self.pull_bar = QProgressBar()
         self.pull_bar.setRange(0, 1000)
         self.pull_bar.setMaximumWidth(160)
         self.pull_bar.hide()
-        oh.addWidget(QLabel("Ollama model"))
+        oh.addWidget(QLabel(_("Ollama model")))
         oh.addWidget(self.ollama_model, 1)
         oh.addWidget(self.btn_pull)
         oh.addWidget(self.pull_bar)
@@ -561,9 +562,9 @@ class ModelsPage(QWizardPage):
         (self.rb_whisper if t == "whisper" else self.rb_ollama if t == "ollama" else self.rb_cloud).setChecked(True)
         ol = self.wiz.ollama_state or check_ollama(s.ollama_url)
         if ol.get("running"):
-            self.pull_state.setText("Installed in Ollama: " + (", ".join(ol.get("models", [])) or "none yet"))
+            self.pull_state.setText(_("Installed in Ollama: ") + (", ".join(ol.get("models", [])) or _("none yet")))
         else:
-            self.pull_state.setText("Ollama isn't running — start it on the previous page to pull a model.")
+            self.pull_state.setText(_("Ollama isn't running — start it on the previous page to pull a model."))
 
     def _fill_models(self, *_a, keep: str = ""):
         eng = self.engine.currentData()
@@ -575,12 +576,12 @@ class ModelsPage(QWizardPage):
         if not mid:
             return
         self.btn_dl.setEnabled(False)
-        self.dl_state.setText("Downloading… (large models can take a while)")
+        self.dl_state.setText(_("Downloading… (large models can take a while)"))
         self.runner.run([(f"Download {mid}", sys.executable, ["-m", "yakusuru.tools.fetch", "asr", eng, mid])])
 
     def _dl_done(self, ok):
         self.btn_dl.setEnabled(True)
-        self.dl_state.setText("✓ Model downloaded" if ok else "✗ Download failed — see log")
+        self.dl_state.setText(_("✓ Model downloaded") if ok else _("✗ Download failed — see log"))
 
     def pull(self):
         name = self.ollama_model.value()
@@ -627,8 +628,8 @@ class KeysPage(QWizardPage):
     def __init__(self, wiz: "SetupWizard"):
         super().__init__()
         self.wiz = wiz
-        self.setTitle("API keys (optional)")
-        self.setSubTitle("Only needed for cloud translators. Keys are saved in your system keychain.")
+        self.setTitle(_("API keys (optional)"))
+        self.setSubTitle(_("Only needed for cloud translators. Keys are saved in your system keychain."))
         v = QVBoxLayout(self)
         from .settings_dialog import ApiKeyRow
         from ..models import TRANSLATORS
@@ -641,16 +642,16 @@ class KeysPage(QWizardPage):
         v.addLayout(f)
         self.pick = QComboBox()
         for prov in ("anthropic", "openai", "gemini", "xai", "deepl"):
-            self.pick.addItem(TRANSLATORS[prov], prov)
+            self.pick.addItem(_(TRANSLATORS[prov]), prov)
         h = QHBoxLayout()
-        h.addWidget(QLabel("Default cloud translator"))
+        h.addWidget(QLabel(_("Default cloud translator")))
         h.addWidget(self.pick, 1)
         v.addLayout(h)
-        v.addWidget(label('Get keys: <a href="https://console.anthropic.com/">Anthropic</a> · '
+        v.addWidget(label(_('Get keys: <a href="https://console.anthropic.com/">Anthropic</a> · '
                           '<a href="https://platform.openai.com/api-keys">OpenAI</a> · '
                           '<a href="https://aistudio.google.com/apikey">Google AI Studio</a> · '
                       '<a href="https://console.x.ai/">xAI</a> · '
-                          '<a href="https://www.deepl.com/your-account/keys">DeepL</a>', "Hint"))
+                          '<a href="https://www.deepl.com/your-account/keys">DeepL</a>'), "Hint"))
         v.addStretch(1)
 
     def initializePage(self):
@@ -671,13 +672,13 @@ class DonePage(QWizardPage):
     def __init__(self, wiz: "SetupWizard"):
         super().__init__()
         self.wiz = wiz
-        self.setTitle("You're all set")
+        self.setTitle(_("You're all set"))
         v = QVBoxLayout(self)
         self.summary = label("", "")
         v.addWidget(self.summary)
-        v.addWidget(label("Drop videos onto the main window and press <b>Start</b>. Finished files can be "
+        v.addWidget(label(_("Drop videos onto the main window and press <b>Start</b>. Finished files can be "
                           "reviewed in the <b>Subtitle Editor</b> (double-click a finished row). "
-                          "Re-open this wizard any time with the <b>Setup</b> button on the main window.", "Muted"))
+                          "Re-open this wizard any time with the <b>Setup</b> button on the main window."), "Muted"))
         v.addStretch(1)
 
     def initializePage(self):
@@ -685,9 +686,9 @@ class DonePage(QWizardPage):
         s = self.wiz.s
         model = s.model_for() if s.translator != "whisper" else ""
         self.summary.setText(
-            f"<p><b>Transcription:</b> {ENGINES.get(s.engine)} · {s.asr_model}</p>"
-            f"<p><b>Translation:</b> {TRANSLATORS.get(s.translator)} {('· ' + model) if model else ''}</p>"
-            f"<p><b>Profile:</b> {PROFILES.get(s.hardware_profile, '')}</p>")
+            f"<p><b>{_('Transcription:')}</b> {_(ENGINES.get(s.engine, ''))} · {s.asr_model}</p>"
+            f"<p><b>{_('Translation:')}</b> {_(TRANSLATORS.get(s.translator, ''))} {('· ' + model) if model else ''}</p>"
+            f"<p><b>{_('Profile:')}</b> {_(PROFILES.get(s.hardware_profile, ''))}</p>")
 
     def validatePage(self):
         self.wiz.s.setup_complete = True
@@ -707,4 +708,4 @@ class SetupWizard(QWizard):
         self.setMinimumSize(860, 700)
         for page in (WelcomePage(self), ComponentsPage(self), ModelsPage(self), KeysPage(self), DonePage(self)):
             self.addPage(page)
-        self.setButtonText(QWizard.WizardButton.FinishButton, "Open the app")
+        self.setButtonText(QWizard.WizardButton.FinishButton, _("Open the app"))

@@ -58,6 +58,8 @@ def worker_main(job_q, event_q, hf_home: str = "") -> None:
         jid = job["id"]
         s = Settings()
         s.update(job["settings"])
+        from .i18n import set_language
+        set_language(s.ui_language)          # progress messages in the interface language
 
         last = {"p": -1.0, "t": time.time(), "stage": "", "m": ""}
         from pathlib import Path as _P

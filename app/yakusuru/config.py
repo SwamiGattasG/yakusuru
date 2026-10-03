@@ -66,6 +66,7 @@ class Settings:
 
     # --- UI ---------------------------------------------------------------
     theme: str = "system"                 # system | dark | light
+    ui_language: str = "system"           # interface language: system | en | es | ja
     accent: str = "system"                # system (OS accent color) | brand (vermilion) | "#rrggbb"
     window_geometry: str = ""
     queue_columns: str = ""               # saved column widths / order of the queue table
