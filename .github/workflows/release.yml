@@ -1,12 +1,21 @@
 name: Release
 
-# Publishes a downloadable zip for a version. Runs when a release is published on GitHub
-# (Releases → Draft a new release) or when a tag like v1.0.0 is pushed.
+# How to publish a version:
+#   add .github/release-notes/vX.Y.Z.md to main (the notes become the release page), or
+#   push a tag vX.Y.Z, or publish a release on GitHub, or run this workflow by hand.
+# The workflow builds Yakusuru-vX.Y.Z.zip and creates (or updates) the release.
 on:
+  push:
+    branches: [main]
+    paths: [".github/release-notes/*.md", ".github/workflows/release.yml"]
+    tags: ["v*"]
   release:
     types: [published]
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version to publish, e.g. v1.0.1 (needs .github/release-notes/<tag>.md)"
+        required: true
 
 permissions:
   contents: write
@@ -16,24 +25,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Build zip
-        run: |
-          tag="${{ github.event.release.tag_name || github.ref_name }}"
-          echo "TAG=$tag" >> "$GITHUB_ENV"
-          # git archive keeps the executable bits the macOS/Linux launchers need.
-          git archive --format=zip --prefix="Yakusuru/" -o "Yakusuru-$tag.zip" HEAD
-          echo "ZIP=Yakusuru-$tag.zip" >> "$GITHUB_ENV"
-      - name: Attach to the release (creating it if needed)
+        with:
+          fetch-depth: 0
+      - name: Work out which versions to publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ZIP" --clobber
-          else
-            notes=".github/release-notes/$TAG.md"
-            if [ -f "$notes" ]; then
-              gh release create "$TAG" "$ZIP" --title "Yakusuru ${TAG#v}" --notes-file "$notes"
+          tags=""
+          case "${{ github.event_name }}" in
+            release)           tags="${{ github.event.release.tag_name }}" ;;
+            workflow_dispatch) tags="${{ inputs.tag }}" ;;
+            push)
+              if [ "${{ github.ref_type }}" = "tag" ]; then tags="${{ github.ref_name }}"
+              else
+                # Every notes file without a published release yet
+                for f in .github/release-notes/v*.md; do
+                  t="$(basename "$f" .md)"
+                  gh release view "$t" >/dev/null 2>&1 || tags="$tags $t"
+                done
+              fi ;;
+          esac
+          echo "TAGS=$tags" >> "$GITHUB_ENV"
+          echo "Publishing: ${tags:-nothing new}"
+      - name: Build zip and publish
+        if: env.TAGS != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $TAGS; do
+            ref="HEAD"
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null && ref="$tag"
+            zip="Yakusuru-$tag.zip"
+            # git archive keeps the executable bits the macOS/Linux launchers need.
+            git archive --format=zip --prefix="Yakusuru/" -o "$zip" "$ref"
+            notes=".github/release-notes/$tag.md"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" "$zip" --clobber
+            elif [ -f "$notes" ]; then
+              gh release create "$tag" "$zip" --target "$GITHUB_SHA" --title "Yakusuru ${tag#v}" --notes-file "$notes" --latest
             else
-              gh release create "$TAG" "$ZIP" --title "Yakusuru ${TAG#v}" --generate-notes
+              gh release create "$tag" "$zip" --target "$GITHUB_SHA" --title "Yakusuru ${tag#v}" --generate-notes --latest
             fi
-          fi
+          done
