@@ -1,0 +1,17 @@
+* text=auto
+# Windows scripts must keep CRLF line endings
+*.bat text eol=crlf
+Windows/*.txt text eol=crlf
+# Unix scripts must keep LF
+*.sh text eol=lf
+*.command text eol=lf
+macOS/Yakusuru.app/Contents/MacOS/Yakusuru text eol=lf
+# Binaries
+*.exe binary
+*.ico binary
+*.icns binary
+*.png binary
+
+# Not needed in the downloadable zip
+.github export-ignore
+.gitattributes export-ignore

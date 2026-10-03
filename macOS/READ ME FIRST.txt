@@ -1,0 +1,12 @@
+Yakusuru — macOS
+
+1. Double-click "Yakusuru.app" (drag it to your Dock if you like).
+   First run: it opens Terminal, finds a native Python (Apple Silicon: arm64 Python 3.10–3.14;
+   Intel Macs: 3.10–3.12), sets up the app once, then opens it.
+2. If setup ever breaks, double-click "Install or Repair.command" (or run it with --reset).
+
+Intel/Rosetta Pythons are skipped on Apple Silicon — get a native one from python.org
+(universal2 installer) or an arm64 Homebrew in /opt/homebrew.
+If macOS says the file can't be opened: right-click it → Open → Open.
+
+More help: ../README.md

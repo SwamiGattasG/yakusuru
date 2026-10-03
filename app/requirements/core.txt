@@ -1,0 +1,9 @@
+# Core runtime — installed automatically by bootstrap.py on first launch.
+# Speech/translation engines (PyTorch, faster-whisper, mlx-whisper, transformers…) are
+# installed per-machine by the in-app Setup Wizard, because the right build depends on your GPU.
+PySide6>=6.6
+numpy>=1.24
+requests>=2.31
+keyring>=24
+imageio-ffmpeg>=0.5
+huggingface_hub>=0.23

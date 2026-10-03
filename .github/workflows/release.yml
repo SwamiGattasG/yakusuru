@@ -1,0 +1,26 @@
+name: Release
+
+# Push a tag like v1.0.0 to publish a downloadable zip on the Releases page.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zip
+        run: |
+          name="Yakusuru-${GITHUB_REF_NAME}"
+          # git archive keeps the executable bits the macOS/Linux launchers need.
+          git archive --format=zip --prefix="Yakusuru/" -o "$name.zip" HEAD
+          echo "ZIP=$name.zip" >> "$GITHUB_ENV"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$ZIP" --title "Yakusuru $GITHUB_REF_NAME" --generate-notes

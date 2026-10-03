@@ -1,0 +1,10 @@
+Yakusuru — Linux
+
+1. In a terminal, run once:   bash install-desktop-entry.sh
+   (prepares the app and adds it to your applications menu)
+2. Then start it from the menu, or with ./yakusuru.sh
+
+Needs: Python 3.10+ with venv (Debian/Ubuntu: sudo apt install python3-venv),
+       libxcb-cursor0 on X11 desktops.
+AMD GPUs: install ROCm first, then pick the "AMD GPU on Linux (ROCm)" profile in the Setup Wizard.
+More help: ../README.md

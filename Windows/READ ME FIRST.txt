@@ -1,0 +1,17 @@
+Yakusuru — Windows
+
+1. Double-click "Yakusuru.exe".
+   First run: a window opens that finds Python (offers to install it with winget), sets up
+   the app once and then opens it. After that, Yakusuru.exe opens the app directly.
+   Windows may say "Windows protected your PC" the first time (the exe isn't code-signed):
+   click "More info" → "Run anyway".
+2. Optional: double-click "Create Desktop Shortcut.bat" for a Desktop / Start-menu shortcut.
+   Keep Yakusuru.exe inside this folder — it needs the "app" folder next to it.
+   You can also drag video files onto Yakusuru.exe to queue them.
+
+GPU: NVIDIA → choose the "NVIDIA GPU (CUDA)" profile in the Setup Wizard.
+     AMD / Intel → "whisper.cpp + Vulkan" profile; the wizard downloads a prebuilt whisper.cpp.
+To rebuild from scratch: run   Yakusuru.exe --reset   (or "Yakusuru.bat" --reset) from a Command Prompt.
+Yakusuru.bat does the same as the exe, in a console window (handy for troubleshooting).
+The launcher's source is in the "launcher" folder (rebuild with launcher/build.sh).
+More help: ..\README.md
