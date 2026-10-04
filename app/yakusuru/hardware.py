@@ -5,7 +5,7 @@ Profiles
 apple_mlx      Apple Silicon Mac        → mlx-whisper (+ PyTorch/MPS for transformers models)
 nvidia_cuda    NVIDIA GPU (Win/Linux)   → faster-whisper on CUDA (+ PyTorch CUDA)
 amd_rocm       AMD GPU on Linux         → PyTorch ROCm + transformers
-vulkan         AMD / Intel GPU (Windows, or Linux without ROCm) → whisper.cpp (Vulkan build)
+vulkan         whisper.cpp, the lightweight native engine (Windows on ARM; optional elsewhere)
 cpu            Anything else            → faster-whisper int8 on CPU
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ PROFILES = {
     "apple_mlx": "Apple Silicon (MLX)",
     "nvidia_cuda": "NVIDIA GPU (CUDA)",
     "amd_rocm": "AMD GPU on Linux (ROCm)",
-    "vulkan": "AMD / Intel GPU (whisper.cpp + Vulkan)",
+    "vulkan": "whisper.cpp (lightweight native engine)",
     "cpu": "CPU only",
 }
 
@@ -96,11 +96,74 @@ def _ram_gb() -> float | None:
         return None
 
 
+def _reg_value(path: str, name: str):
+    """A value under HKEY_LOCAL_MACHINE, or None (Windows only)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as k:
+            return winreg.QueryValueEx(k, name)[0]
+    except Exception:
+        return None
+
+
+def _vendor(name: str) -> str:
+    low = name.lower()
+    return ("nvidia" if "nvidia" in low or "geforce" in low or "quadro" in low
+            else "amd" if ("amd" in low or "radeon" in low or "ati " in low)
+            else "intel" if ("intel" in low or " arc" in low or "iris" in low)
+            else "other")
+
+
+_DISPLAY_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+_SKIP_ADAPTERS = ("basic display", "basic render", "remote display", "virtual", "parsec", "meta")
+
+
+def _windows_registry_video() -> list[GPU]:
+    """Graphics adapters from the registry: fast, needs no PowerShell, and has the real VRAM size
+    (WMI's AdapterRAM stops at 4 GB)."""
+    gpus: list[GPU] = []
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _DISPLAY_CLASS) as cls:
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(cls, i)
+                except OSError:
+                    break
+                i += 1
+                if not sub.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(cls, sub) as k:
+                        def val(n):
+                            try:
+                                return winreg.QueryValueEx(k, n)[0]
+                            except OSError:
+                                return None
+                        name = str(val("DriverDesc") or "").strip()
+                        if not name or any(w in name.lower() for w in _SKIP_ADAPTERS):
+                            continue
+                        mem = val("HardwareInformation.qwMemorySize") or val("HardwareInformation.MemorySize")
+                        if isinstance(mem, bytes):
+                            mem = int.from_bytes(mem[:8], "little")
+                        vram = round(int(mem) / 1024**3, 1) if mem else None
+                        if any(g.name == name for g in gpus):
+                            continue
+                        gpus.append(GPU(_vendor(name), name, vram or None, str(val("DriverVersion") or "")))
+                except OSError:
+                    continue
+    except Exception:
+        return []
+    return gpus
+
+
 def _cpu_name() -> str:
     if sys.platform == "darwin":
         return _run(["sysctl", "-n", "machdep.cpu.brand_string"]).strip() or platform.processor()
     if os.name == "nt":
-        return platform.processor() or os.environ.get("PROCESSOR_IDENTIFIER", "")
+        name = _reg_value(r"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString")
+        return (str(name).strip() if name else "") or platform.processor() or os.environ.get("PROCESSOR_IDENTIFIER", "")
     try:
         with open("/proc/cpuinfo", encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -132,6 +195,11 @@ def _nvidia() -> list[GPU]:
 
 
 def _windows_video() -> list[GPU]:
+    gpus = _windows_registry_video()
+    return gpus or _windows_wmi_video()
+
+
+def _windows_wmi_video() -> list[GPU]:
     out = _run(["powershell", "-NoProfile", "-Command",
                 "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name + '|' + $_.AdapterRAM }"], 15)
     gpus = []
@@ -140,9 +208,9 @@ def _windows_video() -> list[GPU]:
         name = name.strip()
         if not name:
             continue
-        low = name.lower()
-        vendor = ("nvidia" if "nvidia" in low else "amd" if ("amd" in low or "radeon" in low)
-                  else "intel" if "intel" in low else "other")
+        if any(w in name.lower() for w in _SKIP_ADAPTERS):
+            continue
+        vendor = _vendor(name)
         try:
             vram = round(int(ram) / 1024**3, 1) if ram.strip() else None  # caps at 4 GB (WMI limitation)
         except ValueError:
@@ -205,22 +273,25 @@ def detect() -> HardwareInfo:
         info.recommended = "nvidia_cuda"
         vram = max((g.vram_gb or 0) for g in nv)
         if vram and vram < 6:
-            info.notes.append(f"GPU has {vram} GB VRAM — prefer large-v3-turbo / kotoba (int8) models.")
+            info.notes.append(f"GPU has {vram} GB VRAM, so prefer large-v3-turbo or kotoba (int8) models.")
     elif "amd" in vendors and os_key == "linux" and info.rocm:
         info.recommended = "amd_rocm"
-    elif "amd" in vendors and os_key == "linux":
-        info.recommended = "vulkan"
-        info.notes.append("AMD GPU found but ROCm is not installed. Install ROCm for the PyTorch path, "
-                          "or use whisper.cpp with Vulkan.")
-    elif vendors & {"amd", "intel"}:
-        info.recommended = "vulkan"
     else:
+        # AMD / Intel graphics on Windows (and on Linux without ROCm): faster-whisper on the CPU is
+        # the dependable choice. It needs no GPU drivers and handles a long file in reasonable time.
         info.recommended = "cpu"
+        if "amd" in vendors and os_key == "linux":
+            info.notes.append("AMD GPU found but ROCm is not installed. Install ROCm to use the GPU, "
+                              "otherwise Yakusuru uses the fast CPU engine.")
+        elif vendors & {"amd", "intel"}:
+            info.notes.append("AMD and Intel graphics have no ready-made GPU build for Whisper on this "
+                              "system, so Yakusuru uses faster-whisper on the CPU, which works well.")
     if info.recommended not in info.profiles:
-        info.recommended = "vulkan" if "vulkan" in info.profiles and (vendors & {"amd", "intel", "nvidia"}) else "cpu"
+        info.recommended = "cpu"
     if os_key == "windows" and hw_arch == "arm64":
+        info.recommended = "vulkan"
         info.notes.append("Windows on ARM: PyTorch and faster-whisper have no native builds yet, so "
-                          "transcription uses whisper.cpp (Vulkan/CPU).")
+                          "transcription uses whisper.cpp.")
     return info
 
 

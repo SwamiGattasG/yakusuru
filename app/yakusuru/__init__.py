@@ -2,6 +2,6 @@
 
 APP_NAME = "Yakusuru"
 APP_ID = "Yakusuru"
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 AUTHOR = "Swami Gattas"
 HOMEPAGE = "https://github.com/SwamiGattasG/yakusuru"

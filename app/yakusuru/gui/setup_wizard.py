@@ -6,17 +6,16 @@ import logging
 import os
 import shutil
 import sys
-import zipfile
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                               QGridLayout, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPlainTextEdit,
+                               QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
                                QProgressBar, QPushButton, QRadioButton, QScrollArea, QVBoxLayout, QWidget,
                                QWizard, QWizardPage)
 
-from .. import APP_NAME, paths
+from .. import APP_NAME
 from ..config import Settings
 from ..deps import check_ollama, check_python_packages, components_for, status_of
 from ..hardware import PROFILE_DEFAULTS, PROFILES, detect, format_report
@@ -310,14 +309,15 @@ class ComponentsPage(QWizardPage):
                 b.clicked.connect(lambda: self._run([("Homebrew: whisper-cpp", shutil.which("brew"),
                                                       ["install", "whisper-cpp"])]))
                 row.actions.addWidget(b)
-            b = QPushButton(_("Download prebuilt…"))
-            b.clicked.connect(self._download_whispercpp)
-            row.actions.addWidget(b)
+            if row.comp.fetch:
+                b = QPushButton(_("Download prebuilt…"))
+                b.clicked.connect(self._download_whispercpp)
+                row.actions.addWidget(b)
             b = QPushButton(_("Locate whisper-cli…"))
             b.clicked.connect(self._locate_whispercpp)
             row.actions.addWidget(b)
             b = QPushButton(_("Build instructions"))
-            b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/ggml-org/whisper.cpp#vulkan-gpu-support")))
+            b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/ggml-org/whisper.cpp#quick-start")))
             row.actions.addWidget(b)
             row.actions.addStretch(1)
         elif key == "ollama":
@@ -366,6 +366,8 @@ class ComponentsPage(QWizardPage):
         cmds = []
         for key, row in self.rows.items():
             if row.check.isChecked() and not row.comp.manual:
+                if row.comp.fetch:
+                    cmds.append((row.comp.title, sys.executable, ["-m", "yakusuru.tools.fetch", *row.comp.fetch]))
                 for args in row.comp.commands:
                     cmds.append(pip_cmd(row.comp.title, args, self.force.isChecked()))
         if not cmds:
@@ -401,58 +403,12 @@ class ComponentsPage(QWizardPage):
             self.refresh()
 
     def _download_whispercpp(self):
-        self._out("\nLooking up the latest whisper.cpp release on GitHub…\n")
-
-        def fetch():
-            import requests
-            r = requests.get("https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest", timeout=15)
-            r.raise_for_status()
-            j = r.json()
-            return j.get("tag_name", ""), [(a["name"], a["browser_download_url"], a.get("size", 0))
-                                           for a in j.get("assets", []) if a["name"].endswith(".zip")]
-
-        def got(res):
-            tag, assets = res
-            if not assets:
-                self._out("No prebuilt zip files in the latest release — use Homebrew, build from source, or "
-                          "Locate an existing whisper-cli.\n")
-                return
-            plat = {"win32": ("win", "x64"), "darwin": ("mac", "apple", "xcframework")}.get(sys.platform, ("linux",))
-            ranked = sorted(assets, key=lambda a: (not any(k in a[0].lower() for k in plat),
-                                                   "vulkan" not in a[0].lower()))
-            names = [f"{a[0]}  ({a[2] / 1e6:.0f} MB)" for a in ranked]
-            choice, ok = QInputDialog.getItem(self, f"whisper.cpp {tag}",
-                                              _("Choose a build (Vulkan = AMD/Intel GPU, cuBLAS = NVIDIA, "
-                                              "BLAS/plain = CPU):"), names, 0, False)
-            if not ok:
-                return
-            name, url, _size = ranked[names.index(choice)]
-            self._out(f"Downloading {name}…\n")
-            run_async(self._fetch_zip, name, url, on_done=lambda p: (self._out(f"✓ Extracted to {p}\n"),
-                                                                     self.refresh()),
-                      on_error=lambda e: self._out("✗ " + e.split("\n")[0] + "\n"))
-
-        run_async(fetch, on_done=got, on_error=lambda e: self._out("✗ GitHub lookup failed: " +
-                                                                     e.split("\n")[0] + "\n"))
-
-    @staticmethod
-    def _fetch_zip(name: str, url: str) -> str:
-        import requests
-        dest = paths.tools_dir() / "whisper.cpp" / Path(name).stem
-        dest.mkdir(parents=True, exist_ok=True)
-        zpath = dest.with_suffix(".zip")
-        with requests.get(url, stream=True, timeout=60) as r:
-            r.raise_for_status()
-            with open(zpath, "wb") as f:
-                for chunk in r.iter_content(1 << 20):
-                    f.write(chunk)
-        with zipfile.ZipFile(zpath) as z:
-            z.extractall(dest)
-        zpath.unlink(missing_ok=True)
-        if os.name != "nt":
-            for p in dest.rglob("whisper-cli"):
-                p.chmod(0o755)
-        return str(dest)
+        comp = self.rows["whispercpp"].comp if "whispercpp" in self.rows else None
+        if not comp or not comp.fetch:
+            QMessageBox.information(self, "whisper.cpp", _("There is no ready-made whisper.cpp for this "
+                                    "system. On a Mac, install it with Homebrew: brew install whisper-cpp"))
+            return
+        self._run([("whisper.cpp", sys.executable, ["-m", "yakusuru.tools.fetch", *comp.fetch])])
 
     # --- Ollama -------------------------------------------------------------
     def _install_ollama(self):
@@ -608,8 +564,14 @@ class ModelsPage(QWizardPage):
 
     def validatePage(self):
         s = self.wiz.s
+        if self.runner.busy():
+            QMessageBox.information(self, _("Still downloading"),
+                                    _("The speech model is still downloading. Please wait until it finishes."))
+            return False
         s.engine = self.engine.currentData()
         s.asr_model = self.model.value()
+        if not self._model_ready_or_ok():
+            return False
         if self.rb_whisper.isChecked():
             s.translator = "whisper"
         elif self.rb_ollama.isChecked():
@@ -619,6 +581,36 @@ class ModelsPage(QWizardPage):
             s.translator = "anthropic"
         s.save()
         return True
+
+    def _model_ready_or_ok(self) -> bool:
+        """The speech model is required. If it isn't downloaded, say so and offer the choices."""
+        from ..model_fetch import describe, needs_download
+        from ..models import find_asr
+        eng, mid = self.engine.currentData(), self.model.value()
+        try:
+            if not mid or not needs_download(eng, mid):
+                return True
+        except Exception:
+            return True
+        m = find_asr(eng, mid)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(_("Speech model required"))
+        box.setText(_("Yakusuru can't transcribe without a speech recognition model, and this one "
+                      "isn't downloaded yet:"))
+        box.setInformativeText(describe([(mid, m.size_gb if m else None)]) + "\n\n" +
+                               _("Download it now, or let Yakusuru download it automatically the first "
+                                 "time you press Start."))
+        now = box.addButton(_("Download Now"), QMessageBox.ButtonRole.AcceptRole)
+        now.setObjectName("Primary")
+        later = box.addButton(_("Download on First Run"), QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(now)
+        box.exec()
+        if box.clickedButton() is now:
+            self.download_asr()
+            return False          # stay here and show the progress; Next works once it's done
+        return box.clickedButton() is later
 
     def cleanupPage(self):
         pass

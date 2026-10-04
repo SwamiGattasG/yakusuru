@@ -103,6 +103,35 @@ def is_cached(repo: str, filename: str | None, engine: str) -> bool:
         return False
 
 
+def needs_download(engine: str, model_id: str) -> bool:
+    """True when this speech model still has to be downloaded before it can run."""
+    target = resolve(engine, model_id)
+    return target is not None and not is_cached(*target, engine)
+
+
+def missing_for(settings) -> list[tuple[str, float | None]]:
+    """Speech models the next run needs that aren't on disk yet: [(model id, size in GB or None)].
+    Includes large-v3 when Whisper's own translation needs it as a stand-in."""
+    from .models import can_whisper_translate, whisper_translate_model
+    eng = settings.engine
+    ids = [settings.asr_model]
+    if settings.translate and settings.translator == "whisper" and not can_whisper_translate(eng, settings.asr_model):
+        alt = whisper_translate_model(eng)
+        if alt and alt not in ids:
+            ids.append(alt)
+    out = []
+    for mid in ids:
+        if mid and needs_download(eng, mid):
+            m = find_asr(eng, mid)
+            out.append((mid, m.size_gb if m else None))
+    return out
+
+
+def describe(missing: list[tuple[str, float | None]]) -> str:
+    """'kotoba-whisper-v2.0-faster (~1.5 GB)' style list, one per line."""
+    return "\n".join(f"• {mid.split('/')[-1]}" + (f" (~{gb:.1f} GB)" if gb else "") for mid, gb in missing)
+
+
 Progress = Callable[[float, str], None]
 
 

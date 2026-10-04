@@ -23,22 +23,7 @@ if "%HWARCH%"=="arm64" (
 )
 echo   Machine: Windows %HWARCH%
 
-rem 1) Python launcher (py.exe): native-architecture builds only, newest supported first
-where py >nul 2>&1
-if not errorlevel 1 (
-    for %%V in (%VERSIONS%) do (
-        if not defined PY (
-            py -%%V%PYTAG% -c "import platform,sys; sys.exit(0 if platform.machine().upper()=='%WANT%' else 1)" >nul 2>&1
-            if not errorlevel 1 set "PY=py -%%V%PYTAG%"
-        )
-    )
-)
-
-rem 2) python on PATH (skips the Microsoft Store placeholder, which fails this test)
-if not defined PY (
-    python -c "import platform,sys; v=sys.version_info[:2]; sys.exit(0 if (3,10)<=v<=((3,13) if '%HWARCH%'=='arm64' else (3,14)) and platform.machine().upper()=='%WANT%' else 1)" >nul 2>&1
-    if not errorlevel 1 set "PY=python"
-)
+call :findpy
 
 if not defined PY (
     echo.
@@ -49,11 +34,13 @@ if not defined PY (
         set /p "ANS=  Install !WINGET_ID! now with winget? [Y/n] "
         if /i "!ANS!"=="" set "ANS=Y"
         if /i "!ANS!"=="Y" (
-            winget install -e --id !WINGET_ID! --architecture !HWARCH! --accept-package-agreements --accept-source-agreements
-            for %%V in (%VERSIONS%) do if not defined PY (
-                py -%%V%PYTAG% -c "import sys" >nul 2>&1
-                if not errorlevel 1 set "PY=py -%%V%PYTAG%"
-            )
+            winget install -e --id !WINGET_ID! --architecture !HWARCH! --scope user --accept-package-agreements --accept-source-agreements
+            echo.
+            echo   Looking for the new Python...
+            rem This window still has the PATH from before the install: reload it, then search again
+            call :refreshpath
+            call :findpy
+            if defined PY echo   Found it. Continuing with the setup.
         )
     )
 )
@@ -75,3 +62,35 @@ if errorlevel 1 (
     exit /b 1
 )
 endlocal
+exit /b 0
+
+rem ---------------------------------------------------------------------------
+:findpy
+rem 1) Python launcher (py.exe): native-architecture builds only, newest supported first
+for %%V in (%VERSIONS%) do if not defined PY (
+    py -%%V%PYTAG% -c "import platform,sys; sys.exit(0 if platform.machine().upper()=='%WANT%' else 1)" >nul 2>&1
+    if not errorlevel 1 set "PY=py -%%V%PYTAG%"
+)
+rem 2) python on PATH (skips the Microsoft Store placeholder, which fails this test)
+if not defined PY (
+    python -c "import platform,sys; v=sys.version_info[:2]; sys.exit(0 if (3,10)<=v<=((3,13) if '%HWARCH%'=='arm64' else (3,14)) and platform.machine().upper()=='%WANT%' else 1)" >nul 2>&1
+    if not errorlevel 1 set "PY=python"
+)
+rem 3) the standard install folders (per user and all users), in case PATH wasn't updated
+for %%V in (%VERSIONS%) do if not defined PY (
+    set "VN=%%V"
+    set "VN=!VN:.=!"
+    for %%D in ("%LOCALAPPDATA%\Programs\Python\Python!VN!" "%LOCALAPPDATA%\Programs\Python\Python!VN!-arm64" "%ProgramFiles%\Python!VN!" "%ProgramFiles%\Python!VN!-arm64") do if not defined PY (
+        if exist "%%~D\python.exe" (
+            "%%~D\python.exe" -c "import platform,sys; sys.exit(0 if platform.machine().upper()=='%WANT%' else 1)" >nul 2>&1
+            if not errorlevel 1 set "PY="%%~D\python.exe""
+        )
+    )
+)
+exit /b 0
+
+:refreshpath
+set "NEWPATH="
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','User')+';'+[Environment]::GetEnvironmentVariable('Path','Machine')"`) do set "NEWPATH=%%P"
+set "PATH=%LOCALAPPDATA%\Programs\Python\Launcher;%SystemRoot%;!NEWPATH!;%PATH%"
+exit /b 0

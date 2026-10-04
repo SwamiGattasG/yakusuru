@@ -3,6 +3,7 @@
     python -m yakusuru.tools.fetch hf <repo_id>
     python -m yakusuru.tools.fetch hf-file <repo_id> <filename> <dest_dir>
     python -m yakusuru.tools.fetch asr <engine> <model_id>
+    python -m yakusuru.tools.fetch whispercpp [cuda]
 """
 from __future__ import annotations
 
@@ -51,6 +52,15 @@ def fetch_asr(engine: str, model_id: str) -> None:
 
 def main(argv: list[str]) -> int:
     os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+    if argv[:1] == ["whispercpp"]:
+        try:
+            from yakusuru import platform_matrix as pm
+            from yakusuru.whispercpp_fetch import install
+            install(pm.os_key(), pm.hardware_arch(), "cuda" in argv[1:], log=lambda m: print(m, flush=True))
+            return 0
+        except Exception as e:
+            print(f"✗ whisper.cpp download failed: {e}", flush=True)
+            return 1
     if len(argv) < 2:
         print(__doc__)
         return 2

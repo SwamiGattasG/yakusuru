@@ -862,10 +862,35 @@ class MainWindow(QMainWindow):
             return
         if not self._ensure_ollama():
             return
+        if not self._confirm_model_download():
+            return
         self.running = True
         self._queue_started = time.time()
         self._set_running_ui(True)
         self._next()
+
+    def _confirm_model_download(self) -> bool:
+        """The speech model is required: say so before a big first download, and allow cancelling."""
+        from ..model_fetch import describe, missing_for
+        try:
+            missing = missing_for(self.s)
+        except Exception:
+            return True
+        if not missing:
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(_("Download the speech model?"))
+        box.setText(_("The speech recognition model isn't on this computer yet. It's required, so "
+                      "Yakusuru will download it first:"))
+        box.setInformativeText(describe(missing) + "\n\n" +
+                               _("This happens once. Later runs start right away."))
+        go = box.addButton(_("Download and Start"), QMessageBox.ButtonRole.AcceptRole)
+        go.setObjectName("Primary")
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(go)
+        box.exec()
+        return box.clickedButton() is go
 
     def _ensure_ollama(self) -> bool:
         """If Ollama is the translator but isn't installed, offer to install it right here."""

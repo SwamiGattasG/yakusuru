@@ -27,6 +27,7 @@ class Component:
     size: str
     commands: list[list[str]] = field(default_factory=list)  # pip argument lists (after "pip install")
     manual: bool = False        # not pip-installable (whisper.cpp binary, Ollama app)
+    fetch: list[str] = field(default_factory=list)   # args for `python -m yakusuru.tools.fetch` instead of pip
     recommended: bool = False
     available: bool = True      # can this component run on this machine at all?
     unavailable_reason: str = ""
@@ -112,11 +113,16 @@ def components_for(profile: str, hw: HardwareInfo) -> list[Component]:
         "~100 MB", [_pip("transformers", "accelerate")],
         recommended=profile in ("nvidia_cuda", "amd_rocm", "apple_mlx") and ok,
         available=ok, unavailable_reason=why))
+    wc_auto = osk in ("windows", "linux")
+    wc_nvidia = any(g.vendor == "nvidia" for g in hw.gpus)
     comps.append(Component(
-        "whispercpp", "whisper.cpp (Vulkan / Metal)",
-        "Native Whisper executable. The GPU path for AMD and Intel graphics (Vulkan build) and for "
-        "Windows on ARM; uses Metal on Macs.",
-        "~20 MB", manual=True, recommended=profile == "vulkan"))
+        "whispercpp", "whisper.cpp",
+        ("A small native Whisper program, used mainly on Windows on ARM. Installed with Homebrew on a Mac."
+         if not wc_auto else
+         "A small native Whisper program, used mainly on Windows on ARM. Downloads a ready-made build "
+         "from GitHub (NVIDIA builds use the GPU, others the CPU)."),
+        "~20 MB", manual=not wc_auto, fetch=(["whispercpp"] + (["cuda"] if wc_nvidia else [])) if wc_auto else [],
+        recommended=profile == "vulkan"))
     comps.append(Component(
         "furigana", "Furigana (Japanese readings)",
         "SudachiPy and its dictionary: adds kana readings over kanji in Japanese subtitles (optional).",

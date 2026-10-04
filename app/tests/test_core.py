@@ -942,3 +942,61 @@ def test_mac_launcher_finds_its_code_wherever_it_is(tmp_path):
     (tmp_path / "home/Library/Application Support/Yakusuru/app-folder").unlink()
     code, log = launch(moved)
     assert code == 1 and "find its files" in log
+
+
+def test_whispercpp_prebuilt_is_picked_from_older_releases(tmp_path):
+    from yakusuru import whispercpp_fetch as wf
+    rels = [  # newest first: the latest release has source only
+        {"tag_name": "v1.9.4", "assets": []},
+        {"tag_name": "b5130", "assets": [{"name": n, "browser_download_url": "u/" + n, "size": 1}
+                                         for n in ("whisper-bin-x64.zip", "whisper-blas-bin-x64.zip",
+                                                   "whisper-cublas-12.4.0-bin-x64.zip",
+                                                   "whisper-bin-win-cpu-arm64.zip",
+                                                   "whisper-bin-ubuntu-x64.tar.gz")]},
+    ]
+    assert wf.pick(rels, wf.wanted_assets("windows", "x86_64"))[1] == "whisper-blas-bin-x64.zip"
+    assert wf.pick(rels, wf.wanted_assets("windows", "x86_64", nvidia=True))[1] == "whisper-cublas-12.4.0-bin-x64.zip"
+    assert wf.pick(rels, wf.wanted_assets("windows", "arm64"))[1] == "whisper-bin-win-cpu-arm64.zip"
+    assert wf.pick(rels, wf.wanted_assets("linux", "x86_64"))[0] == "b5130"
+    assert wf.wanted_assets("macos", "arm64") == []
+    # extraction finds the program inside the archive's folder
+    import zipfile
+    z = tmp_path / "a.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("Release/whisper-cli" + (".exe" if os.name == "nt" else ""), "x")
+    wf.extract(z, tmp_path / "out")
+    assert wf.find_cli(tmp_path / "out").parent.name == "Release"
+
+
+def test_whispercpp_is_installable_and_amd_windows_gets_cpu(monkeypatch):
+    from yakusuru import hardware
+    from yakusuru.deps import components_for
+    from yakusuru.hardware import GPU, HardwareInfo
+    hw = HardwareInfo(os="windows", os_version="11", arch="x86_64", cpu="Ryzen", ram_gb=32, python="3.13.0",
+                      gpus=[GPU("amd", "AMD Radeon RX 7800 XT", 16.0)])
+    wc = {c.key: c for c in components_for("cpu", hw)}["whispercpp"]
+    assert not wc.manual and wc.fetch == ["whispercpp"]
+    mac = HardwareInfo(os="macos", os_version="15", arch="arm64", cpu="M4", ram_gb=16, python="3.13.0")
+    assert {c.key: c for c in components_for("apple_mlx", mac)}["whispercpp"].manual
+    # detection: AMD graphics on Windows x64 recommends the CPU engine, not the whisper.cpp dead end
+    from yakusuru import platform_matrix as pm
+    monkeypatch.setattr(pm, "os_key", lambda: "windows")
+    monkeypatch.setattr(pm, "hardware_arch", lambda: "x86_64")
+    monkeypatch.setattr(pm, "python_arch", lambda: "x86_64")
+    monkeypatch.setattr(pm, "check_python", lambda: (True, ""))
+    monkeypatch.setattr(hardware, "_nvidia", lambda: [])
+    monkeypatch.setattr(hardware, "_windows_video", lambda: [GPU("amd", "AMD Radeon RX 7800 XT", 16.0)])
+    monkeypatch.setattr(hardware, "_cpu_name", lambda: "AMD Ryzen 7 7700X")
+    assert hardware.detect().recommended == "cpu"
+
+
+def test_missing_models_include_translate_stand_in(monkeypatch):
+    from yakusuru import model_fetch
+    from yakusuru.config import Settings
+    s = Settings()
+    s.engine, s.asr_model, s.translate, s.translator = "faster_whisper", "large-v3-turbo", True, "whisper"
+    monkeypatch.setattr(model_fetch, "needs_download", lambda e, m: True)
+    ids = [m for m, _gb in model_fetch.missing_for(s)]
+    assert ids[0] == "large-v3-turbo" and "large-v3" in ids
+    monkeypatch.setattr(model_fetch, "needs_download", lambda e, m: False)
+    assert model_fetch.missing_for(s) == []

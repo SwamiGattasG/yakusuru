@@ -76,6 +76,14 @@ jobs:
           "bootstrap received: $got"
           if ($got -ne 'C:\Videos\ep 01 会話.mp4') { throw "Launcher didn't forward the file name correctly" }
           if ($p.ExitCode -ne 0) { throw "Launcher exited with $($p.ExitCode)" }
+          # The console path: Yakusuru.bat finds Python and hands over to bootstrap.py
+          Copy-Item Windows\Yakusuru.bat "$root\Windows\"
+          Remove-Item $log
+          cmd /c "`"$root\Windows\Yakusuru.bat`" clip.mp4 < NUL"
+          if ($LASTEXITCODE -ne 0) { throw "Yakusuru.bat exited with $LASTEXITCODE" }
+          $got = Get-Content -Raw -Encoding utf8 $log
+          "bat -> bootstrap received: $got"
+          if ($got -ne 'clip.mp4') { throw "Yakusuru.bat didn't start bootstrap.py with the arguments" }
       - name: Check it's a GUI app (no console window flashes)
         shell: python
         run: |

@@ -5,8 +5,8 @@
 1 RT_MANIFEST "yakusuru.manifest"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION     1,1,2,0
- PRODUCTVERSION  1,1,2,0
+ FILEVERSION     1,1,3,0
+ PRODUCTVERSION  1,1,3,0
  FILEFLAGSMASK   0x3fL
  FILEFLAGS       0x0L
  FILEOS          VOS_NT_WINDOWS32
@@ -19,11 +19,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Yakusuru"
             VALUE "FileDescription",  "Yakusuru — AI subtitles in any language"
-            VALUE "FileVersion",      "1.1.2"
+            VALUE "FileVersion",      "1.1.3"
             VALUE "InternalName",     "Yakusuru"
             VALUE "OriginalFilename", "Yakusuru.exe"
             VALUE "ProductName",      "Yakusuru (訳する)"
-            VALUE "ProductVersion",   "1.1.2"
+            VALUE "ProductVersion",   "1.1.3"
         END
     END
     BLOCK "VarFileInfo"
