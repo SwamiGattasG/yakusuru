@@ -199,41 +199,92 @@ class WelcomePage(QWizardPage):
         return True
 
 
+STATUS_W = 210      # width of the Status column, shared by the header and every row
+CHECK_W = 22        # width of the checkbox column
+
+
+class StatusCell(QWidget):
+    """The Status column of one component: a coloured dot, a short state, and the detail under it."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedWidth(STATUS_W)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(1)
+        top = QHBoxLayout()
+        top.setSpacing(6)
+        self.dot = StatusDot()
+        self.text = QLabel()
+        top.addWidget(self.dot)
+        top.addWidget(self.text, 1)
+        v.addLayout(top)
+        self.detail = QLabel()
+        self.detail.setObjectName("Hint")
+        v.addWidget(self.detail)
+        v.addStretch(1)
+
+    def show_state(self, color: str, text: str, detail: str = ""):
+        self.dot.set_color(color)
+        self.text.setText(f"<b>{text}</b>")
+        fm = self.detail.fontMetrics()
+        self.detail.setText(fm.elidedText(detail, Qt.TextElideMode.ElideMiddle, STATUS_W - 4))
+        self.setToolTip(detail if detail else "")
+
+
 class ComponentRow(QWidget):
     def __init__(self, comp, parent=None):
         super().__init__(parent)
         self.comp = comp
         g = QGridLayout(self)
-        g.setContentsMargins(4, 6, 4, 6)
+        g.setContentsMargins(4, 8, 4, 8)
         g.setHorizontalSpacing(10)
+        g.setColumnMinimumWidth(0, CHECK_W)
         self.check = QCheckBox()
         self.check.setChecked(comp.recommended and comp.available and not comp.manual)
         self.check.setEnabled(comp.available and not comp.manual)
-        self.dot = StatusDot()
         title = QLabel(f"<b>{_(comp.title)}</b>  <span style='color:{theme.current()['muted']}'>{comp.size}</span>"
                        + (f"  <span style='color:{theme.current()['accent']}'>" + _("recommended") + "</span>"
                           if comp.recommended else ""))
-        desc = label(_(comp.description) if comp.available else f"{_(comp.description)} ({_(comp.unavailable_reason)})",
-                     "Hint")
-        self.state = QLabel(_("checking…"))
-        self.state.setObjectName("Hint")
+        desc = label(_(comp.description), "Hint")
+        self.status = StatusCell()
         self.actions = QHBoxLayout()
-        g.addWidget(self.check, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
+        g.addWidget(self.check, 0, 0, Qt.AlignmentFlag.AlignTop)
         g.addWidget(title, 0, 1)
-        g.addWidget(self.dot, 0, 2, Qt.AlignmentFlag.AlignRight)
-        g.addWidget(self.state, 0, 3)
-        g.addWidget(desc, 1, 1, 1, 3)
-        g.addLayout(self.actions, 2, 1, 1, 3)
+        g.addWidget(desc, 1, 1)
+        g.addLayout(self.actions, 2, 1)
+        g.addWidget(self.status, 0, 2, 3, 1, Qt.AlignmentFlag.AlignTop)
         g.setColumnStretch(1, 1)
+        self.set_checking()
         if not comp.available:
-            self.setEnabled(False)
+            self.check.setEnabled(False)
+            self.status.show_state(theme.current()["muted"], _("Not available"), _(comp.unavailable_reason))
+
+    def set_checking(self):
+        if self.comp.available:
+            self.status.show_state(theme.current()["muted"], _("Checking…"))
 
     def set_status(self, ok: bool, detail: str):
         t = theme.current()
-        self.dot.set_color(t["ok"] if ok else (t["warn"] if self.comp.recommended else t["muted"]))
-        self.state.setText((_("Installed · ") if ok else "") + detail)
-        if ok and not self.comp.manual:
-            self.check.setChecked(False)
+        if not self.comp.available:
+            return
+        if ok:
+            self.status.show_state(t["ok"], _("Installed"), detail)
+            if not self.comp.manual:
+                self.check.setChecked(False)
+        elif detail == "installed but not running":
+            self.status.show_state(t["warn"], _("Not running"), _("Installed, press Start Ollama"))
+        else:
+            missing = detail in ("not installed", "not found", "whisper-cli not found", "")
+            self.status.show_state(t["warn"] if self.comp.recommended else t["muted"], _("Not installed"),
+                                   "" if missing else _(detail))
+
+    def set_error(self, detail: str):
+        if self.comp.available:
+            self.status.show_state(theme.current()["err"], _("Couldn't check"), detail)
+
+
+PIP_KEYS = ("torch", "faster_whisper", "mlx_whisper", "transformers", "furigana")
 
 
 class ComponentsPage(QWizardPage):
@@ -243,6 +294,19 @@ class ComponentsPage(QWizardPage):
         self.setTitle(_("Install components"))
         self.setSubTitle(_("Tick what you want and press Install. Green means ready."))
         v = QVBoxLayout(self)
+        head = QWidget()
+        hg = QGridLayout(head)
+        hg.setContentsMargins(14, 0, 14 + self.style().pixelMetric(self.style().PixelMetric.PM_ScrollBarExtent), 0)
+        hg.setHorizontalSpacing(10)
+        hg.setColumnMinimumWidth(0, CHECK_W)
+        for col, text in ((1, _("Component")), (2, _("Status"))):
+            lab = QLabel(f"<b>{text}</b>")
+            lab.setObjectName("Hint")
+            if col == 2:
+                lab.setFixedWidth(STATUS_W)
+            hg.addWidget(lab, 0, col)
+        hg.setColumnStretch(1, 1)
+        v.addWidget(head)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.rows_host = QWidget()
@@ -333,25 +397,52 @@ class ComponentsPage(QWizardPage):
 
     def refresh(self):
         for r in self.rows.values():
-            r.state.setText(_("checking…"))
+            r.set_checking()
+        self.btn_refresh.setEnabled(False)
         s = self.wiz.s
 
         def work():
+            # Each check on its own, so one failure can't leave the other rows without a status.
             from ..engines.whispercpp_engine import find_binary
-            return check_python_packages(), check_ollama(s.ollama_url), find_binary(s.whispercpp_binary)
+            out = {}
+            for name, fn in (("pk", check_python_packages), ("ol", lambda: check_ollama(s.ollama_url)),
+                             ("wc", lambda: find_binary(s.whispercpp_binary))):
+                try:
+                    out[name] = fn()
+                except Exception as e:
+                    out[name + "_error"] = f"{type(e).__name__}: {e}"
+            return out
 
-        run_async(work, on_done=self._apply_status)
+        run_async(work, on_done=self._apply_status, on_error=self._check_failed)
+
+    def _check_failed(self, err: str):
+        self.btn_refresh.setEnabled(True)
+        msg = err.strip().splitlines()[-1] if err.strip() else ""
+        for row in self.rows.values():
+            row.set_error(msg)
+        self._out(f"Component check failed: {msg}\n")
 
     def _apply_status(self, res):
-        pk, ol, wc = res
+        self.btn_refresh.setEnabled(True)
+        pk = res.get("pk") or {"error": res.get("pk_error", "")}
+        ol, wc = res.get("ol"), res.get("wc")
         self.wiz.ollama_state = ol
+        pk_err = pk.get("error")
         for key, row in self.rows.items():
-            ok, detail = status_of(key, pk, ol, wc)
-            if not row.comp.available:
-                detail = row.comp.unavailable_reason
+            if key == "ollama" and "ol_error" in res:
+                row.set_error(res["ol_error"])
+                continue
+            if pk_err and key in PIP_KEYS:
+                row.set_error(pk_err.strip().splitlines()[-1] if pk_err.strip() else "")
+                continue
+            try:
+                ok, detail = status_of(key, pk, ol, wc)
+            except Exception as e:
+                row.set_error(str(e))
+                continue
             row.set_status(ok, detail)
-        if "error" in pk:
-            self._out(f"Package check failed: {pk['error']}\n")
+        if pk_err:
+            self._out(f"Package check failed: {pk_err}\n")
 
     def _run(self, cmds):
         if self.runner.busy():
